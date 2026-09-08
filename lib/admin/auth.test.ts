@@ -3,6 +3,11 @@ import assert from "node:assert/strict";
 import { createAdminSession, createAdminSessionCookie, resolveAdminSession, type SupportUser } from "./auth";
 import { createSupportCabinetCookie, readSupportCabinet, cabinetMatchesAdmin } from "./impersonation";
 import {
+  createSharedAdminPortalToken,
+  readSharedAdminPortalUserId,
+  verifySharedAdminPassword,
+} from "../portal/adminAccess";
+import {
   clearLoginFailures,
   isLoginRateLimited,
   isSameOriginRequest,
@@ -25,7 +30,7 @@ const response = () => ({ statusCode: 200, headers: {} as Record<string, any>, b
   status(code: number) { this.statusCode = code; return this; }, json(body: any) { this.body = body; return this; },
 });
 
-test('legacy ADMIN_PASSWORD is only usable as a session-encryption migration fallback', async () => {
+test('ADMIN_PASSWORD supports client-portal override but not dashboard authentication', async () => {
   const configuredSecret = process.env.ADMIN_SESSION_SECRET;
   const legacySecret = process.env.ADMIN_PASSWORD;
   delete process.env.ADMIN_SESSION_SECRET;
@@ -36,8 +41,14 @@ test('legacy ADMIN_PASSWORD is only usable as a session-encryption migration fal
     const cabinet = readSupportCabinet(
       createSupportCabinetCookie(admin, { targetUserId: 15, clientId: 23, machineId: 9 }),
     );
+    const portalToken = createSharedAdminPortalToken(15);
     assert.match(header, /^ishaker_admin_session=/);
     assert.equal(cabinetMatchesAdmin(cabinet, admin), true);
+    assert.equal(verifySharedAdminPassword("existing-deployment-secret"), true);
+    assert.equal(verifySharedAdminPassword("wrong"), false);
+    assert.equal(readSharedAdminPortalUserId(portalToken), 15);
+    process.env.ADMIN_PASSWORD = "rotated-deployment-secret";
+    assert.equal(readSharedAdminPortalUserId(portalToken), null);
   } finally {
     if (configuredSecret === undefined) delete process.env.ADMIN_SESSION_SECRET;
     else process.env.ADMIN_SESSION_SECRET = configuredSecret;

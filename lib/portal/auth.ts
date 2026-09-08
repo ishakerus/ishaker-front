@@ -13,6 +13,10 @@ import { resolveAdminSession } from "../admin/auth";
 import { supportContext } from "../admin/context";
 import { cabinetMatchesAdmin, hasSupportCabinet, readSupportCabinet } from "../admin/impersonation";
 import {
+  isSharedAdminPortalToken,
+  readSharedAdminPortalUserId,
+} from "./adminAccess";
+import {
   requestStrapiRestAsService,
   requestStrapiRestWithJwt,
 } from "../../services/server/strapiClient";
@@ -74,6 +78,11 @@ export const fetchPortalUser = async (jwt: string) => {
 const fetchPortalUserForSupport = (userId: string | number, jwt: string) =>
   requestStrapiRestWithJwt<PortalUser>(
     `/api/users/${userId}?populate[0]=client&populate[1]=role`, jwt,
+  );
+
+const fetchPortalUserAsService = (userId: string | number) =>
+  requestStrapiRestAsService<PortalUser>(
+    `/api/users/${userId}?populate[0]=client&populate[1]=role`,
   );
 
 const normalizeRoleKey = (value?: string) =>
@@ -187,11 +196,15 @@ export const resolvePortalSession = async (
   const admin = hasSupportCabinet(cookieHeader) ? await resolveAdminSession(cookieHeader) : null;
   if (hasSupportCabinet(cookieHeader) && !cabinetMatchesAdmin(cabinet, admin)) return null;
   if (!credential && !cabinet) return null;
+  const sharedAdminUserId = readSharedAdminPortalUserId(credential);
+  if (isSharedAdminPortalToken(credential) && !sharedAdminUserId) return null;
   let user: PortalUser;
   try {
     user = cabinet
       ? await fetchPortalUserForSupport(cabinet.targetUserId, admin!.jwt)
-      : await fetchPortalUser(credential!);
+      : sharedAdminUserId
+        ? await fetchPortalUserAsService(sharedAdminUserId)
+        : await fetchPortalUser(credential!);
   } catch (error) {
     const status = (error as { status?: number }).status;
     // Expired, revoked, and pre-deployment cookies are simply signed-out

@@ -17,7 +17,7 @@ Existing admin currency, preset and localization editors remain available. Produ
 
 Set `ADMIN_SESSION_SECRET` to at least 32 random characters, for example the output of `openssl rand -base64 48`. Keep it server-side, stable across restarts and identical across frontend instances. Rotating it signs out every support session. During migration, an existing `ADMIN_PASSWORD` is accepted only as this encryption-key fallback; it is never accepted as a login credential. Optionally set `APP_ORIGIN` to the canonical frontend origin; otherwise mutation Origin checks compare against the request Host.
 
-`ADMIN_PASSWORD` no longer authenticates either the dashboard or a client cabinet. Existing shared-password cookies are rejected. The frontend still needs its existing Strapi service credentials for client-scoped reads.
+`ADMIN_PASSWORD` no longer authenticates the dashboard. For backward compatibility, `/login` still accepts a client nickname/email with `ADMIN_PASSWORD` and creates a 30-minute encrypted client-portal grant. Changing or removing `ADMIN_PASSWORD` invalidates those grants. The frontend still needs its existing Strapi service credentials for client-scoped reads.
 
 ## Creating another support user
 

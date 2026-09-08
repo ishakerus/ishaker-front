@@ -1,8 +1,9 @@
 import crypto from "crypto";
 
 const key = () => {
-  // ADMIN_PASSWORD is kept as a deployment-compatible secret fallback only.
-  // It is never compared with a login form or accepted as a credential.
+  // ADMIN_PASSWORD remains a deployment-compatible encryption fallback and
+  // the explicit shared override for client-portal login. It never authenticates
+  // the support dashboard.
   const configuredSecret = process.env.ADMIN_SESSION_SECRET;
   if (configuredSecret && configuredSecret.length < 32) {
     throw new Error("ADMIN_SESSION_SECRET must contain at least 32 characters.");
