@@ -27,7 +27,7 @@ Alternatively, from the backend project directory, pass a JSON object with `user
 
 ## Opening a client cabinet
 
-Click the machine name in the dashboard table. A POST endpoint derives the client and active client user from the machine; the browser supplies only the machine ID. A machine must be assigned to a client with an enabled cabinet and an active client login.
+Click **Cabinet** in the machine row's Action column. The button is disabled when the assigned client has no active cabinet login. A POST endpoint derives the client and active client user from the machine; the browser supplies only the machine ID and the server rechecks availability. A machine must be assigned to a client with an enabled cabinet and an active client login.
 
 The frontend issues a separate encrypted, HttpOnly support cookie for at most 30 minutes, capped by the 8-hour support login. No reusable password or credential is included in a URL or page props. The support cookie is tied to the exact support login. Every request rechecks the support user, role, blocked state, account update timestamp, target client user, and the selected machine's client assignment. Expired access returns to the dashboard. **Exit to dashboard** clears cabinet access while preserving the support login. A pre-existing normal client cookie is not replaced when opening a support cabinet.
 
@@ -39,4 +39,4 @@ Support sign-ins, cabinet entry/exit and dashboard/cabinet mutation attempts/res
 
 Run `npm test`, `npx tsc --noEmit`, and `npm run build` in `front`; run `npm test` in `strapi`. Browser verification covers sign-in, machine-click entry, visible support identity, exit and logout. API integration covers permitted machine edits, forbidden operations, and cross-origin rejection.
 
-Deploy the backend support role, Support audit API and bootstrap hook before the frontend. Configure the frontend session secret before deploying the updated frontend. The test account is `artur.support`; its password is supplied privately, never committed. The existing client account `artur` is preserved.
+Deploy the backend support role, Support audit API and bootstrap hook before the frontend. Configure the frontend session secret before deploying the updated frontend. The test account is `artur.support`; its password is supplied privately, never committed.
