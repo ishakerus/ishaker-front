@@ -34,6 +34,7 @@ import type {
 } from "../../types/strapi";
 import { AdminHeader } from "./AdminHeader";
 import { Metric } from "./Metric";
+import { capitalize } from "../../services/helper";
 
 export type AdminDashboardProps = {
   clients: Client[];
@@ -97,12 +98,23 @@ export function AdminDashboard({
   const openCabinet = async (machine: Machine) => {
     setOpeningMachine(String(machine.id));
     try {
-      const response = await fetch(`/api/admin/machines/${machine.id}/cabinet`, { method: "POST" });
+      const response = await fetch(
+        `/api/admin/machines/${machine.id}/cabinet`,
+        { method: "POST" },
+      );
       const payload = await response.json();
-      if (!response.ok) throw new Error(payload.message || "Unable to open the client cabinet.");
+      if (!response.ok)
+        throw new Error(
+          payload.message || "Unable to open the client cabinet.",
+        );
       window.location.href = payload.redirect;
     } catch (error) {
-      toast({ title: (error as Error).message, status: "error", duration: 6000, isClosable: true });
+      toast({
+        title: (error as Error).message,
+        status: "error",
+        duration: 6000,
+        isClosable: true,
+      });
       setOpeningMachine(null);
     }
   };
@@ -158,10 +170,7 @@ export function AdminDashboard({
   const filteredMachines = useMemo(() => {
     const normalizedSearch = search.trim().toLowerCase();
     return visibleMachines.filter((machine) => {
-      if (
-        verdictFilter &&
-        machine.readiness?.verdict !== verdictFilter
-      ) {
+      if (verdictFilter && machine.readiness?.verdict !== verdictFilter) {
         return false;
       }
       if (
@@ -241,8 +250,9 @@ export function AdminDashboard({
               </Text>
               {readinessSummary.frequentFailures.length ? (
                 <HStack spacing="2" flexWrap="wrap">
-                  {readinessSummary.frequentFailures.slice(0, 5).map(
-                    ([checkId, occurrences]) => (
+                  {readinessSummary.frequentFailures
+                    .slice(0, 5)
+                    .map(([checkId, occurrences]) => (
                       <Tooltip
                         key={checkId}
                         hasArrow
@@ -292,8 +302,7 @@ export function AdminDashboard({
                           {occurrences.length === 1 ? "machine" : "machines"}
                         </Badge>
                       </Tooltip>
-                    ),
-                  )}
+                    ))}
                 </HStack>
               ) : (
                 <Text color="bg.500" fontSize="sm">
@@ -422,7 +431,7 @@ export function AdminDashboard({
                         }}
                       >
                         <Td color="bg.100" fontWeight="700" py="2.5">
-                          {machine.nickname || "—"}
+                          {capitalize(machine.nickname || "—")}
                         </Td>
                         <Td color="bg.300" py="2.5">
                           {machine.client?.company || "Unassigned"}
@@ -463,14 +472,18 @@ export function AdminDashboard({
                               onClick={() => openCabinet(machine)}
                               isDisabled={
                                 !machine.client?.id ||
-                                !cabinetClients.has(Number(machine.client.id)) ||
+                                !cabinetClients.has(
+                                  Number(machine.client.id),
+                                ) ||
                                 openingMachine !== null
                               }
                               isLoading={openingMachine === String(machine.id)}
                               title={
                                 !machine.client?.id
                                   ? "No client assigned"
-                                  : cabinetClients.has(Number(machine.client.id))
+                                  : cabinetClients.has(
+                                        Number(machine.client.id),
+                                      )
                                     ? "Open client cabinet as support"
                                     : "This client has no active cabinet login"
                               }
@@ -478,14 +491,14 @@ export function AdminDashboard({
                               Cabinet
                             </Button>
                             <Button
-                            as={Link}
-                            href={`/admin/machines/${machine.id}`}
-                            size="xs"
-                            variant="outline"
-                            borderColor="whiteAlpha.200"
-                          >
-                            Details
-                          </Button>
+                              as={Link}
+                              href={`/admin/machines/${machine.id}`}
+                              size="xs"
+                              variant="outline"
+                              borderColor="whiteAlpha.200"
+                            >
+                              Details
+                            </Button>
                           </HStack>
                         </Td>
                       </Tr>

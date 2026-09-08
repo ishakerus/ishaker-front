@@ -334,12 +334,7 @@ function MachineCard({ machine }: { machine: FleetMachine }) {
           <Wrap spacing="1.5">
             {machine.active_tastes.map((taste) => (
               <WrapItem key={taste}>
-                <Badge
-                  borderRadius="full"
-                  px="2"
-                  py="1"
-                  textTransform="none"
-                >
+                <Badge borderRadius="full" px="2" py="1" textTransform="none">
                   {taste}
                 </Badge>
               </WrapItem>
@@ -485,13 +480,13 @@ export function Stats({ showMachines = false }: StatsProps) {
         Recent transactions
       </Text>
       {isLoading ? (
-        <SimpleGrid columns={{ base: 1, md: 2 }} spacing="4">
+        <SimpleGrid columns={{ base: 1, md: 3 }} spacing="4">
           {[0, 1, 2, 3].map((item) => (
             <Skeleton key={item} h="220px" borderRadius="2xl" />
           ))}
         </SimpleGrid>
       ) : sales.length ? (
-        <SimpleGrid columns={{ base: 1, md: 2 }} spacing="4">
+        <SimpleGrid columns={{ base: 1, md: 3 }} spacing="4">
           {sales.map((sale) => (
             <RecentSaleCard
               key={`${sale.at}-${sale.serial_masked}`}
