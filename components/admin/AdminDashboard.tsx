@@ -23,7 +23,7 @@ import {
 } from "@chakra-ui/react";
 import { NextSeo } from "next-seo";
 import Link from "next/link";
-import { useEffect, useMemo, useState } from "react";
+import { useMemo, useState } from "react";
 import { getMachinePatchVersion } from "../../lib/admin/machinePatch";
 import { isReadinessVerdict } from "../../lib/admin/readiness";
 import type {
@@ -33,7 +33,6 @@ import type {
 } from "../../types/strapi";
 import { AdminHeader } from "./AdminHeader";
 import { Metric } from "./Metric";
-import { ReadinessBadge } from "./ReadinessBadge";
 
 export type AdminDashboardProps = {
   clients: Client[];
@@ -79,7 +78,6 @@ export function AdminDashboard({
   machines,
   cabinetClientIds,
   loadError,
-  readinessReferenceTime,
 }: AdminDashboardProps) {
   const cabinetClients = useMemo(
     () => new Set(cabinetClientIds),
@@ -102,13 +100,6 @@ export function AdminDashboard({
   const [search, setSearch] = useState("");
   const [verdictFilter, setVerdictFilter] = useState("");
   const [failedCheckFilter, setFailedCheckFilter] = useState("");
-  const [readinessNow, setReadinessNow] = useState(readinessReferenceTime);
-
-  useEffect(() => {
-    const interval = window.setInterval(() => setReadinessNow(Date.now()), 60_000);
-    return () => window.clearInterval(interval);
-  }, []);
-
   const readinessSummary = useMemo(() => {
     const verdictCounts: Record<MachineReadinessVerdict, number> = {
       SHIP: 0,
@@ -391,12 +382,10 @@ export function AdminDashboard({
               <Table size="sm" variant="simple">
                 <Thead bg="whiteAlpha.50">
                   <Tr>
-                    <Th>Machine</Th>
                     <Th>Client</Th>
                     <Th>Serial</Th>
                     <Th>AnyDesk</Th>
                     <Th>Patch</Th>
-                    <Th>Readiness</Th>
                     <Th textAlign="right">Action</Th>
                   </Tr>
                 </Thead>
@@ -408,14 +397,6 @@ export function AdminDashboard({
                         key={machine.id}
                         _hover={{ bg: "whiteAlpha.50" }}
                       >
-                        <Td py="2.5">
-                          <Text color="bg.50" fontWeight="800" noOfLines={1}>
-                            {machineName(machine)}
-                          </Text>
-                          <Text color="bg.500" fontSize="xs">
-                            ID {machine.id}
-                          </Text>
-                        </Td>
                         <Td color="bg.300" py="2.5">
                           {machine.client?.company || "Unassigned"}
                         </Td>
@@ -444,12 +425,6 @@ export function AdminDashboard({
                               Not reported
                             </Text>
                           )}
-                        </Td>
-                        <Td py="2.5" minW="240px">
-                          <ReadinessBadge
-                            readiness={machine.readiness}
-                            now={readinessNow}
-                          />
                         </Td>
                         <Td py="2.5" textAlign="right">
                           <HStack justify="flex-end">
