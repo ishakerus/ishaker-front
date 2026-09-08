@@ -26,6 +26,7 @@ import Link from "next/link";
 import { useMemo, useState } from "react";
 import { getMachinePatchVersion } from "../../lib/admin/machinePatch";
 import { isReadinessVerdict } from "../../lib/admin/readiness";
+import { buildMachineHealthRow } from "../../lib/portal/machineHealth";
 import type {
   Client,
   Machine,
@@ -78,6 +79,7 @@ export function AdminDashboard({
   machines,
   cabinetClientIds,
   loadError,
+  readinessReferenceTime,
 }: AdminDashboardProps) {
   const cabinetClients = useMemo(
     () => new Set(cabinetClientIds),
@@ -392,10 +394,19 @@ export function AdminDashboard({
                 <Tbody>
                   {filteredMachines.map((machine) => {
                     const patchVersion = getMachinePatchVersion(machine);
+                    const isOffline =
+                      buildMachineHealthRow(
+                        machine,
+                        null,
+                        readinessReferenceTime,
+                      ).online.state === "error";
                     return (
                       <Tr
                         key={machine.id}
-                        _hover={{ bg: "whiteAlpha.50" }}
+                        bg={isOffline ? "blackAlpha.300" : undefined}
+                        _hover={{
+                          bg: isOffline ? "blackAlpha.400" : "whiteAlpha.50",
+                        }}
                       >
                         <Td color="bg.300" py="2.5">
                           {machine.client?.company || "Unassigned"}
@@ -407,7 +418,7 @@ export function AdminDashboard({
                           {machine.anydesk_id ? (
                             <ChakraLink
                               href={`anydesk:${machine.anydesk_id}`}
-                              color="acid.300"
+                              color={isOffline ? "red.300" : "acid.300"}
                               fontFamily="mono"
                               fontWeight="700"
                             >
