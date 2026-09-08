@@ -115,6 +115,14 @@ export const AdminMachinesQuery = `
           serial_number
           readiness
           fleet_status
+          machine_type {
+            data {
+              id
+              attributes {
+                name
+              }
+            }
+          }
           patch {
             data {
               id

@@ -63,6 +63,13 @@ type FailureOccurrence = {
 const machineName = (machine: Machine) =>
   machine.serial_number || machine.title || `Machine #${machine.id}`;
 
+const isDashboardMachineType = (machine: Machine) =>
+  ["shakers", "shakertouch"].includes(
+    String(machine.machine_type?.name || "")
+      .toLowerCase()
+      .replace(/[^a-z0-9]+/g, ""),
+  );
+
 const groupFailureOccurrences = (occurrences: FailureOccurrence[]) => {
   const groups = new Map<string, FailureOccurrence[]>();
   occurrences.forEach((occurrence) => {
@@ -102,6 +109,10 @@ export function AdminDashboard({
   const [search, setSearch] = useState("");
   const [verdictFilter, setVerdictFilter] = useState("");
   const [failedCheckFilter, setFailedCheckFilter] = useState("");
+  const visibleMachines = useMemo(
+    () => machines.filter(isDashboardMachineType),
+    [machines],
+  );
   const readinessSummary = useMemo(() => {
     const verdictCounts: Record<MachineReadinessVerdict, number> = {
       SHIP: 0,
@@ -110,7 +121,7 @@ export function AdminDashboard({
     };
     const failureOccurrences = new Map<string, FailureOccurrence[]>();
 
-    machines.forEach((machine) => {
+    visibleMachines.forEach((machine) => {
       if (isReadinessVerdict(machine.readiness?.verdict)) {
         verdictCounts[machine.readiness.verdict] += 1;
       }
@@ -133,7 +144,7 @@ export function AdminDashboard({
 
     return {
       verdictCounts,
-      unchecked: machines.filter(
+      unchecked: visibleMachines.filter(
         (machine) => !isReadinessVerdict(machine.readiness?.verdict),
       ).length,
       frequentFailures: Array.from(failureOccurrences.entries()).sort(
@@ -142,11 +153,11 @@ export function AdminDashboard({
           leftId.localeCompare(rightId),
       ),
     };
-  }, [machines]);
+  }, [visibleMachines]);
 
   const filteredMachines = useMemo(() => {
     const normalizedSearch = search.trim().toLowerCase();
-    return machines.filter((machine) => {
+    return visibleMachines.filter((machine) => {
       if (
         verdictFilter &&
         machine.readiness?.verdict !== verdictFilter
@@ -174,7 +185,7 @@ export function AdminDashboard({
           .includes(normalizedSearch),
       );
     });
-  }, [failedCheckFilter, machines, search, verdictFilter]);
+  }, [failedCheckFilter, search, verdictFilter, visibleMachines]);
 
   return (
     <>
@@ -190,7 +201,7 @@ export function AdminDashboard({
         >
           <SimpleGrid columns={{ base: 1, sm: 3 }} spacing="3" mb="4">
             <Metric label="Clients" value={clients.length} />
-            <Metric label="All machines" value={machines.length} />
+            <Metric label="All machines" value={visibleMachines.length} />
             <Metric label="Not checked" value={readinessSummary.unchecked} />
           </SimpleGrid>
 
@@ -376,7 +387,7 @@ export function AdminDashboard({
                 Machines
               </Text>
               <Text color="bg.400" fontSize="sm">
-                Showing {filteredMachines.length} of {machines.length}
+                Showing {filteredMachines.length} of {visibleMachines.length}
               </Text>
             </HStack>
 
