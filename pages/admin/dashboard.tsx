@@ -2,13 +2,17 @@ import type { GetServerSideProps } from "next";
 import { AdminDashboard } from "../../components/admin";
 import { requireAdminSession } from "../../lib/admin/auth";
 import { requestStrapiAsService } from "../../services/server/strapiClient";
+import { requestStrapiRestAsService } from "../../services/server/strapiClient";
 import normalize from "../../services/normalizer";
 import { AdminClientsQuery, AdminMachinesQuery } from "../../services/queries";
 import type { Client, Machine } from "../../types/strapi";
+import type { PortalUser } from "../../types/portal";
+import { isClientCabinetUser } from "../../lib/portal/auth";
 
 type DashboardProps = {
   clients: Client[];
   machines: Machine[];
+  cabinetClientIds: number[];
   loadError?: string;
   readinessReferenceTime: number;
 };
@@ -18,9 +22,12 @@ export const getServerSideProps: GetServerSideProps<DashboardProps> = async (con
   if (redirect) return redirect;
 
   try {
-    const [clientsRaw, machinesRaw] = await Promise.all([
+    const [clientsRaw, machinesRaw, users] = await Promise.all([
       requestStrapiAsService<any>(AdminClientsQuery),
       requestStrapiAsService<any>(AdminMachinesQuery),
+      requestStrapiRestAsService<PortalUser[]>(
+        "/api/users?fields[0]=id&fields[1]=blocked&fields[2]=confirmed&populate[0]=client&populate[1]=role&pagination[pageSize]=2000",
+      ),
     ]);
     const clientsResult = normalize(clientsRaw);
     const machinesResult = normalize(machinesRaw);
@@ -28,9 +35,16 @@ export const getServerSideProps: GetServerSideProps<DashboardProps> = async (con
       (client) => client.status === "client",
     );
     const machines = (machinesResult?.machines || []) as Machine[];
+    const cabinetClientIds = Array.from(
+      new Set(
+        users
+          .filter(isClientCabinetUser)
+          .map((user) => Number(user.client!.id)),
+      ),
+    );
 
     return {
-      props: { clients, machines, readinessReferenceTime: Date.now() },
+      props: { clients, machines, cabinetClientIds, readinessReferenceTime: Date.now() },
     };
   } catch (error) {
     console.error("[admin/dashboard] clients load failed:", error);
@@ -38,6 +52,7 @@ export const getServerSideProps: GetServerSideProps<DashboardProps> = async (con
       props: {
         clients: [],
         machines: [],
+        cabinetClientIds: [],
         readinessReferenceTime: Date.now(),
         loadError: "Client data is unavailable. Check Strapi connection and service credentials.",
       },
@@ -48,6 +63,7 @@ export const getServerSideProps: GetServerSideProps<DashboardProps> = async (con
 export default function AdminDashboardPage({
   clients,
   machines,
+  cabinetClientIds,
   loadError,
   readinessReferenceTime,
 }: DashboardProps) {
@@ -55,6 +71,7 @@ export default function AdminDashboardPage({
     <AdminDashboard
       clients={clients}
       machines={machines}
+      cabinetClientIds={cabinetClientIds}
       loadError={loadError}
       readinessReferenceTime={readinessReferenceTime}
     />

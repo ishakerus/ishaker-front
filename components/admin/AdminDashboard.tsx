@@ -38,6 +38,7 @@ import { ReadinessBadge } from "./ReadinessBadge";
 export type AdminDashboardProps = {
   clients: Client[];
   machines: Machine[];
+  cabinetClientIds: number[];
   loadError?: string;
   readinessReferenceTime: number;
 };
@@ -76,9 +77,14 @@ const groupFailureOccurrences = (occurrences: FailureOccurrence[]) => {
 export function AdminDashboard({
   clients,
   machines,
+  cabinetClientIds,
   loadError,
   readinessReferenceTime,
 }: AdminDashboardProps) {
+  const cabinetClients = useMemo(
+    () => new Set(cabinetClientIds),
+    [cabinetClientIds],
+  );
   const toast = useToast();
   const [openingMachine, setOpeningMachine] = useState<string | null>(null);
   const openCabinet = async (machine: Machine) => {
@@ -403,13 +409,9 @@ export function AdminDashboard({
                         _hover={{ bg: "whiteAlpha.50" }}
                       >
                         <Td py="2.5">
-                          <Button variant="link" color="acid.300" fontWeight="800"
-                            onClick={() => openCabinet(machine)}
-                            isDisabled={!machine.client?.id || openingMachine !== null}
-                            isLoading={openingMachine === String(machine.id)}
-                            title={machine.client?.id ? "Open client cabinet as support" : "No client assigned"}>
+                          <Text color="bg.50" fontWeight="800" noOfLines={1}>
                             {machineName(machine)}
-                          </Button>
+                          </Text>
                           <Text color="bg.500" fontSize="xs">
                             ID {machine.id}
                           </Text>
@@ -450,7 +452,30 @@ export function AdminDashboard({
                           />
                         </Td>
                         <Td py="2.5" textAlign="right">
-                          <Button
+                          <HStack justify="flex-end">
+                            <Button
+                              size="xs"
+                              variant="outline"
+                              borderColor="acid.500"
+                              color="acid.300"
+                              onClick={() => openCabinet(machine)}
+                              isDisabled={
+                                !machine.client?.id ||
+                                !cabinetClients.has(Number(machine.client.id)) ||
+                                openingMachine !== null
+                              }
+                              isLoading={openingMachine === String(machine.id)}
+                              title={
+                                !machine.client?.id
+                                  ? "No client assigned"
+                                  : cabinetClients.has(Number(machine.client.id))
+                                    ? "Open client cabinet as support"
+                                    : "This client has no active cabinet login"
+                              }
+                            >
+                              Cabinet
+                            </Button>
+                            <Button
                             as={Link}
                             href={`/admin/machines/${machine.id}`}
                             size="xs"
@@ -459,6 +484,7 @@ export function AdminDashboard({
                           >
                             Details
                           </Button>
+                          </HStack>
                         </Td>
                       </Tr>
                     );
