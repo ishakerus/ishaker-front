@@ -1,3 +1,4 @@
+import { withSupportPortalApi } from "../../../../../lib/admin/access";
 import type { NextApiRequest, NextApiResponse } from "next";
 import {
   assertMachineBelongsToSessionClient,
@@ -77,7 +78,7 @@ const parseAssignments = (value: unknown): Assignment[] | null => {
   return assignments as Assignment[];
 };
 
-export default async function handler(req: NextApiRequest, res: NextApiResponse) {
+async function handler(req: NextApiRequest, res: NextApiResponse) {
   if (!["GET", "POST", "PUT", "DELETE"].includes(req.method || "")) {
     res.setHeader("Allow", ["GET", "POST", "PUT", "DELETE"]);
     return res.status(405).json({ error: "method_not_allowed" });
@@ -337,3 +338,5 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
     });
   }
 }
+
+export default withSupportPortalApi(handler);

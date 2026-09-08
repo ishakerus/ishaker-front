@@ -1,3 +1,4 @@
+import { withSupportPortalApi } from "../../../../../lib/admin/access";
 import type { NextApiRequest, NextApiResponse } from "next";
 import {
   assertMachineBelongsToSessionClient,
@@ -22,7 +23,7 @@ const asId = (value: string | string[] | undefined) => {
 const hasOwn = (body: unknown, key: string) =>
   Boolean(body && Object.prototype.hasOwnProperty.call(body, key));
 
-export default async function handler(
+async function handler(
   req: NextApiRequest,
   res: NextApiResponse,
 ) {
@@ -164,3 +165,5 @@ export default async function handler(
     });
   }
 }
+
+export default withSupportPortalApi(handler);

@@ -355,7 +355,7 @@ export default function AdminVoiceClipsPage() {
               Save voice clip
             </Button>
             {form.id ? (
-              <Button colorScheme="red" variant="outline" onClick={remove}>
+              <Button colorScheme="red" variant="outline" onClick={remove} isDisabled title="Support cannot delete records">
                 Delete
               </Button>
             ) : null}
@@ -367,6 +367,6 @@ export default function AdminVoiceClipsPage() {
 }
 
 export const getServerSideProps: GetServerSideProps = async (context) => {
-  const redirect = requireAdminSession(context);
+  const redirect = await requireAdminSession(context);
   return redirect || { props: {} };
 };

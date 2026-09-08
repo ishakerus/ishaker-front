@@ -1,3 +1,4 @@
+import { withSupportPortalApi } from "../../../../../lib/admin/access";
 import type { NextApiRequest, NextApiResponse } from "next";
 import { capitalizeName } from "../../../../../lib/formatName";
 import { getPortalSessionFromApiRequest } from "../../../../../lib/portal/auth";
@@ -189,7 +190,7 @@ const parseComponents = (value: unknown): SubmittedComponent[] | null => {
     : null;
 };
 
-export default async function handler(req: NextApiRequest, res: NextApiResponse) {
+async function handler(req: NextApiRequest, res: NextApiResponse) {
   if (req.method !== "POST" && req.method !== "PUT") {
     res.setHeader("Allow", ["POST", "PUT"]);
     return res.status(405).json({ error: "method_not_allowed" });
@@ -595,6 +596,9 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
     const customComponents = submittedComponents.filter(
       (component) => !component.componentId,
     );
+    if (session.support && customComponents.length) {
+      return res.status(403).json({ error: "support_permission_denied", message: "Support must select existing nutrition components when editing products." });
+    }
     const createdCustomComponents = await Promise.all(
       customComponents.map((component) =>
         requestStrapiRestAsService<CatalogComponent>("/api/components", {
@@ -719,3 +723,5 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
     });
   }
 }
+
+export default withSupportPortalApi(handler);

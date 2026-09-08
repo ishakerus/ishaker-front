@@ -1,3 +1,4 @@
+import { withSupportPortalApi } from "../../../../lib/admin/access";
 import type { NextApiRequest, NextApiResponse } from "next";
 import { getStrapiBaseUrl } from "../../../../services/fetchers";
 
@@ -7,8 +8,10 @@ const getOrigin = (req: NextApiRequest) => {
   return `${proto}://${req.headers.host}`;
 };
 
-export default function handler(req: NextApiRequest, res: NextApiResponse) {
+function handler(req: NextApiRequest, res: NextApiResponse) {
   const callback = `${getOrigin(req)}/portal/google/callback`;
   const url = `${getStrapiBaseUrl()}/api/connect/google?callback=${encodeURIComponent(callback)}`;
   res.redirect(url);
 }
+
+export default withSupportPortalApi(handler);

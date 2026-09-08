@@ -1,3 +1,4 @@
+import { withSupportPortalApi } from "../../../lib/admin/access";
 import type { NextApiRequest, NextApiResponse } from "next";
 import { assertMachineBelongsToSessionClient, getPortalSessionFromApiRequest } from "../../../lib/portal/auth";
 import { requestStrapiRestAsService } from "../../../services/server/strapiClient";
@@ -11,7 +12,7 @@ const iso = (value: string, end: boolean) => {
   return Number.isNaN(parsed.getTime()) ? "" : parsed.toISOString();
 };
 
-export default async function handler(req: NextApiRequest, res: NextApiResponse) {
+async function handler(req: NextApiRequest, res: NextApiResponse) {
   if (req.method !== "GET") {
     res.setHeader("Allow", ["GET"]);
     return res.status(405).json({ error: "method_not_allowed" });
@@ -43,3 +44,5 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
     return res.status(500).json({ error: "sales_summary_failed", message: "Sales summary could not be loaded." });
   }
 }
+
+export default withSupportPortalApi(handler);

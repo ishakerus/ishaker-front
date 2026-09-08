@@ -1,3 +1,4 @@
+import { withAdminApi } from "../../../../lib/admin/access";
 import type { NextApiRequest, NextApiResponse } from "next";
 import { requireAdminApiSession } from "../../../../lib/admin/auth";
 import { requestStrapiRestAsService } from "../../../../services/server/strapiClient";
@@ -8,7 +9,7 @@ const idFrom = (value: string | string[] | undefined) => {
   return id && /^\d+$/.test(id) ? id : "";
 };
 
-export default async function handler(
+async function handler(
   req: NextApiRequest,
   res: NextApiResponse,
 ) {
@@ -50,3 +51,5 @@ export default async function handler(
     });
   }
 }
+
+export default withAdminApi(handler);

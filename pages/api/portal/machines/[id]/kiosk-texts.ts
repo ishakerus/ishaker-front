@@ -1,3 +1,4 @@
+import { withSupportPortalApi } from "../../../../../lib/admin/access";
 import type { NextApiRequest, NextApiResponse } from "next";
 import {
   assertMachineBelongsToSessionClient,
@@ -137,7 +138,7 @@ const slugify = (value: string) =>
     .replace(/^-+|-+$/g, "")
     .slice(0, 220);
 
-export default async function handler(
+async function handler(
   req: NextApiRequest,
   res: NextApiResponse,
 ) {
@@ -272,6 +273,9 @@ export default async function handler(
         .map((entry) => [Number(entry.translation!.id), entry]),
     );
 
+    if (session.support && normalizedChanges.some((change) => !change.value!.trim() && entriesByTranslation.has(change.translationId))) {
+      return res.status(403).json({ error: "support_cannot_delete", message: "Support can edit translations, but cannot remove overrides." });
+    }
     for (const change of normalizedChanges) {
       const value = change.value!;
       const existing = entriesByTranslation.get(change.translationId);
@@ -317,3 +321,5 @@ export default async function handler(
     });
   }
 }
+
+export default withSupportPortalApi(handler);

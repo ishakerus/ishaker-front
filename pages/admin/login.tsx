@@ -5,6 +5,7 @@ import { FormEvent, useState } from "react";
 
 export default function AdminLoginPage() {
   const router = useRouter();
+  const [identifier, setIdentifier] = useState("");
   const [password, setPassword] = useState("");
   const [error, setError] = useState("");
   const [isLoading, setIsLoading] = useState(false);
@@ -14,20 +15,23 @@ export default function AdminLoginPage() {
     setError("");
     setIsLoading(true);
 
-    const response = await fetch("/api/admin/login", {
-      method: "POST",
-      headers: { "content-type": "application/json" },
-      body: JSON.stringify({ password }),
-    });
-
-    setIsLoading(false);
-
-    if (!response.ok) {
-      setError("Invalid password");
-      return;
+    try {
+      const response = await fetch("/api/admin/login", {
+        method: "POST",
+        headers: { "content-type": "application/json" },
+        body: JSON.stringify({ identifier, password }),
+      });
+      if (!response.ok) {
+        setError(response.status === 429 ? "Too many attempts. Try again in 15 minutes." :
+          response.status === 503 ? "Sign-in is temporarily unavailable." : "Invalid login or password, or support access is disabled.");
+        return;
+      }
+      await router.replace("/admin/dashboard");
+    } catch {
+      setError("Unable to connect. Please try again.");
+    } finally {
+      setIsLoading(false);
     }
-
-    router.replace("/admin/dashboard");
   };
 
   return (
@@ -49,7 +53,7 @@ export default function AdminLoginPage() {
             Private cabinet
           </Heading>
           <Text color="bg.300" mb={8}>
-            Enter the server password to continue to the client machine dashboard.
+            Sign in with your individual support account.
           </Text>
 
           <Box
@@ -62,7 +66,11 @@ export default function AdminLoginPage() {
             p={{ base: 5, md: 6 }}
             boxShadow="0 18px 55px rgba(0, 0, 0, 0.28)"
           >
-            <FormControl>
+            <FormControl mb={5} isRequired>
+              <FormLabel color="bg.100" fontWeight="700">Login or email</FormLabel>
+              <Input value={identifier} onChange={(event) => setIdentifier(event.target.value)} autoComplete="username" autoCapitalize="none" spellCheck={false} bg="bg.800" borderColor="whiteAlpha.200" color="bg.50" h="48px" />
+            </FormControl>
+            <FormControl isRequired>
               <FormLabel color="bg.100" fontWeight="700">Password</FormLabel>
               <Input
                 type="password"
@@ -90,7 +98,7 @@ export default function AdminLoginPage() {
             <Button
               type="submit"
               isLoading={isLoading}
-              isDisabled={!password}
+              isDisabled={!identifier.trim() || !password}
               mt={6}
               w="100%"
               h="48px"

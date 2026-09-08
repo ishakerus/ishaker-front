@@ -1,3 +1,4 @@
+import { withAdminApi } from "../../../../lib/admin/access";
 import type { NextApiRequest, NextApiResponse } from "next";
 import { requireAdminApiSession } from "../../../../lib/admin/auth";
 import { requestStrapiRestAsService } from "../../../../services/server/strapiClient";
@@ -9,7 +10,7 @@ const idFrom = (value: string | string[] | undefined) => {
 const text = (input: unknown) =>
   typeof input === "string" ? input.trim() : "";
 
-export default async function handler(
+async function handler(
   req: NextApiRequest,
   res: NextApiResponse,
 ) {
@@ -57,3 +58,5 @@ export default async function handler(
     return res.status(500).json({ error: "translation_request_failed" });
   }
 }
+
+export default withAdminApi(handler);

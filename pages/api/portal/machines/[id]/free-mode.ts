@@ -1,3 +1,4 @@
+import { withSupportPortalApi } from "../../../../../lib/admin/access";
 import type { NextApiRequest, NextApiResponse } from "next";
 import { parseFreeModeMinutes } from "../../../../../lib/freeMode";
 import {
@@ -14,7 +15,7 @@ const asId = (value: string | string[] | undefined) => {
   return id && /^\d+$/.test(id) ? id : "";
 };
 
-export default async function handler(
+async function handler(
   req: NextApiRequest,
   res: NextApiResponse,
 ) {
@@ -76,3 +77,5 @@ export default async function handler(
     });
   }
 }
+
+export default withSupportPortalApi(handler);

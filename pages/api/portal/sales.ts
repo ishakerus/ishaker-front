@@ -1,3 +1,4 @@
+import { withSupportPortalApi } from "../../../lib/admin/access";
 import type { NextApiRequest, NextApiResponse } from "next";
 import {
   assertMachineBelongsToSessionClient,
@@ -78,7 +79,7 @@ const salesCsv = (sales: Sale[]) => {
   ].map((row) => row.map(csvCell).join(",")).join("\r\n");
 };
 
-export default async function handler(req: NextApiRequest, res: NextApiResponse) {
+async function handler(req: NextApiRequest, res: NextApiResponse) {
   if (req.method !== "GET") {
     res.setHeader("Allow", ["GET"]);
     return res.status(405).json({ error: "method_not_allowed" });
@@ -140,3 +141,5 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
     return res.status(500).json({ error: "sales_load_failed", message: "Sales could not be loaded." });
   }
 }
+
+export default withSupportPortalApi(handler);

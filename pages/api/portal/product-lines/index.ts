@@ -1,3 +1,4 @@
+import { withSupportPortalApi } from "../../../../lib/admin/access";
 import type { NextApiRequest, NextApiResponse } from "next";
 import { getPortalSessionFromApiRequest } from "../../../../lib/portal/auth";
 import { requestWithSplashOwnershipFallback } from "../../../../lib/portal/splashOwnership";
@@ -37,7 +38,7 @@ const loadVisibleSplash = async (id: string, userId: string | number) => {
   return splashes[0] || null;
 };
 
-export default async function handler(req: NextApiRequest, res: NextApiResponse) {
+async function handler(req: NextApiRequest, res: NextApiResponse) {
   if (req.method !== "POST") {
     res.setHeader("Allow", ["POST"]);
     return res.status(405).json({ error: "method_not_allowed" });
@@ -161,3 +162,5 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
     });
   }
 }
+
+export default withSupportPortalApi(handler);

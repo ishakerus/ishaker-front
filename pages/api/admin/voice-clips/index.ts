@@ -1,3 +1,4 @@
+import { withAdminApi } from "../../../../lib/admin/access";
 import type { NextApiRequest, NextApiResponse } from "next";
 import { requireAdminApiSession } from "../../../../lib/admin/auth";
 import { requestStrapiRestAsService } from "../../../../services/server/strapiClient";
@@ -12,7 +13,7 @@ export const config = { api: { bodyParser: false } };
 const categories = new Set(["event", "screen", "cup", "payment", "button"]);
 const statuses = new Set(["draft", "reviewed", "approved"]);
 
-export default async function handler(
+async function handler(
   req: NextApiRequest,
   res: NextApiResponse,
 ) {
@@ -97,3 +98,5 @@ export default async function handler(
     });
   }
 }
+
+export default withAdminApi(handler);

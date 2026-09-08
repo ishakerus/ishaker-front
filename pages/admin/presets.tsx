@@ -623,7 +623,7 @@ export default function AdminPresetsPage() {
               >
                 Save preset
               </Button>
-              {form.id ? <Button colorScheme="red" variant="outline" onClick={remove}>Delete</Button> : null}
+              {form.id ? <Button colorScheme="red" variant="outline" onClick={remove} isDisabled title="Support cannot delete records">Delete</Button> : null}
             </HStack>
 
             {form.id ? (
@@ -694,6 +694,6 @@ export default function AdminPresetsPage() {
 }
 
 export const getServerSideProps: GetServerSideProps = async (context) => {
-  const redirect = requireAdminSession(context);
+  const redirect = await requireAdminSession(context);
   return redirect || { props: {} };
 };

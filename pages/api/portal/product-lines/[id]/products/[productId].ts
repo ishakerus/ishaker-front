@@ -1,3 +1,4 @@
+import { withSupportPortalApi } from "../../../../../../lib/admin/access";
 import type { NextApiRequest, NextApiResponse } from "next";
 import { getPortalSessionFromApiRequest } from "../../../../../../lib/portal/auth";
 import { deleteProductAndAssignments } from "../../../../../../services/server/deleteProduct";
@@ -9,7 +10,7 @@ const asId = (value: unknown) => {
   return /^\d+$/.test(id) ? id : "";
 };
 
-export default async function handler(req: NextApiRequest, res: NextApiResponse) {
+async function handler(req: NextApiRequest, res: NextApiResponse) {
   if (req.method !== "PATCH" && req.method !== "DELETE") {
     res.setHeader("Allow", ["PATCH", "DELETE"]);
     return res.status(405).json({ error: "method_not_allowed" });
@@ -97,3 +98,5 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
     });
   }
 }
+
+export default withSupportPortalApi(handler);

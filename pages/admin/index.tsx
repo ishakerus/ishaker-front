@@ -1,9 +1,9 @@
 import type { GetServerSideProps } from "next";
-import { isValidAdminSession } from "../../lib/admin/auth";
+import { resolveAdminSession } from "../../lib/admin/auth";
 
 export const getServerSideProps: GetServerSideProps = async (context) => ({
   redirect: {
-    destination: isValidAdminSession(context.req.headers.cookie)
+    destination: await resolveAdminSession(context.req.headers.cookie)
       ? "/admin/dashboard"
       : "/admin/login",
     permanent: false,

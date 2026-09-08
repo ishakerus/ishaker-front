@@ -161,7 +161,7 @@ export default function AdminTranslationsPage() {
                 <Td verticalAlign="top">
                   <VStack align="stretch">
                     <Input value={translation.key} onChange={(event) => setTranslations((items) => items.map((item) => item.id === translation.id ? { ...item, key: event.target.value } : item))} />
-                    <HStack><Button size="xs" onClick={() => saveKey(translation)}>Save key</Button><Button size="xs" colorScheme="red" variant="ghost" onClick={() => deleteKey(translation)}>Delete</Button></HStack>
+                    <HStack><Button size="xs" onClick={() => saveKey(translation)}>Save key</Button><Button size="xs" colorScheme="red" variant="ghost" onClick={() => deleteKey(translation)} isDisabled title="Support cannot delete records">Delete</Button></HStack>
                   </VStack>
                 </Td>
                 <Td verticalAlign="top"><Text>{translation.namespace || "—"}</Text></Td>
@@ -179,6 +179,6 @@ export default function AdminTranslationsPage() {
 }
 
 export const getServerSideProps: GetServerSideProps = async (context) => {
-  const redirect = requireAdminSession(context);
+  const redirect = await requireAdminSession(context);
   return redirect || { props: {} };
 };

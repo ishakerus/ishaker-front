@@ -1,3 +1,4 @@
+import { withSupportPortalApi } from "../../../../lib/admin/access";
 import type { NextApiRequest, NextApiResponse } from "next";
 import { getPortalSessionFromApiRequest } from "../../../../lib/portal/auth";
 import {
@@ -16,7 +17,7 @@ import {
 import type { TelemetryHealthInput } from "../../../../types/machineHealth";
 import { getMachineCells } from "../../../../services/server/machineCells";
 
-export default async function handler(
+async function handler(
   req: NextApiRequest,
   res: NextApiResponse,
 ) {
@@ -101,3 +102,5 @@ export default async function handler(
     }),
   });
 }
+
+export default withSupportPortalApi(handler);

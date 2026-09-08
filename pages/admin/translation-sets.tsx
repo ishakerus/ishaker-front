@@ -119,6 +119,6 @@ export default function AdminTranslationSetsPage() {
 }
 
 export const getServerSideProps: GetServerSideProps = async (context) => {
-  const redirect = requireAdminSession(context);
+  const redirect = await requireAdminSession(context);
   return redirect || { props: {} };
 };

@@ -1,124 +1,56 @@
 import crypto from "crypto";
-import type {
-  GetServerSidePropsContext,
-  NextApiRequest,
-  NextApiResponse,
-} from "next";
+import type { GetServerSidePropsContext, NextApiRequest, NextApiResponse } from "next";
+import { requestStrapiRestWithJwt } from "../../services/server/strapiClient";
+import { readCookie, seal, sessionCookie, unseal } from "./cookies";
+import { supportContext, type SupportIdentity } from "./context";
 
 const COOKIE_NAME = "ishaker_admin_session";
 const SESSION_TTL_SECONDS = 60 * 60 * 8;
-const IMPERSONATION_TOKEN_PREFIX = "admin-impersonation";
 
-const getAdminPassword = () => {
-  const password = process.env.ADMIN_PASSWORD;
-  if (!password) {
-    throw new Error("Missing ADMIN_PASSWORD in the frontend server environment.");
-  }
-  return password;
+export type SupportUser = {
+  id: number;
+  username: string;
+  updatedAt: string;
+  blocked?: boolean;
+  confirmed?: boolean;
+  role?: { type?: string };
 };
 
-export const isAdminPasswordConfigured = () =>
-  Boolean(process.env.ADMIN_PASSWORD);
+export const isSupportUser = (user?: SupportUser | null) =>
+  Boolean(user?.id && user.role?.type === "support" && !user.blocked && user.confirmed !== false);
 
-const sign = (value: string) =>
-  crypto.createHmac("sha256", getAdminPassword()).update(value).digest("hex");
+export const createAdminSession = (user: SupportUser, jwt: string): SupportIdentity => ({
+  id: user.id, username: user.username, updatedAt: user.updatedAt, jwt,
+  sid: crypto.randomUUID(), expiresAt: Date.now() + SESSION_TTL_SECONDS * 1000,
+});
 
-const safeEqual = (a: string, b: string) => {
-  const aBuffer = Buffer.from(a);
-  const bBuffer = Buffer.from(b);
-  return aBuffer.length === bBuffer.length && crypto.timingSafeEqual(aBuffer, bBuffer);
+export const createAdminSessionCookie = (session: SupportIdentity) =>
+  sessionCookie(COOKIE_NAME, seal(COOKIE_NAME, session), SESSION_TTL_SECONDS);
+export const clearAdminSessionCookie = () => sessionCookie(COOKIE_NAME, "", 0);
+export const setAdminSession = (res: NextApiResponse, session: SupportIdentity) =>
+  res.setHeader("Set-Cookie", createAdminSessionCookie(session));
+
+export const resolveAdminSession = async (cookieHeader?: string): Promise<SupportIdentity | null> => {
+  const session = unseal<SupportIdentity>(COOKIE_NAME, readCookie(cookieHeader, COOKIE_NAME));
+  if (!session?.jwt || !session.id || !session.sid || !session.updatedAt) return null;
+  try {
+    // Consult Strapi on every request: blocked/deleted users, role changes and
+    // account/password changes must invalidate an already issued session.
+    const user = await requestStrapiRestWithJwt<SupportUser>("/api/users/me", session.jwt);
+    if (!isSupportUser(user) || user.id !== session.id || user.updatedAt !== session.updatedAt) return null;
+    return { ...session, username: user.username };
+  } catch { return null; }
 };
 
-export const verifyAdminPassword = (password: string) =>
-  safeEqual(password, getAdminPassword());
-
-export const createAdminImpersonationToken = (userId: string | number) => {
-  const normalizedUserId = String(userId);
-  if (!/^\d+$/.test(normalizedUserId)) {
-    throw new Error("A numeric portal user id is required for impersonation.");
-  }
-
-  const expiresAt = Math.floor(Date.now() / 1000) + SESSION_TTL_SECONDS;
-  const payload = `${IMPERSONATION_TOKEN_PREFIX}.${normalizedUserId}.${expiresAt}`;
-  return `${payload}.${sign(payload)}`;
+export const requireAdminSession = async (context: GetServerSidePropsContext) => {
+  context.res.setHeader("Cache-Control", "private, no-store");
+  if (await resolveAdminSession(context.req.headers.cookie)) return null;
+  return { redirect: { destination: "/admin/login", permanent: false as const } };
 };
 
-export const readAdminImpersonationUserId = (token: string) => {
-  const parts = token.split(".");
-  if (parts.length !== 4) return null;
-
-  const [prefix, userId, expiresAtRaw, signature] = parts;
-  const expiresAt = Number(expiresAtRaw);
-  if (prefix !== IMPERSONATION_TOKEN_PREFIX || !/^\d+$/.test(userId)) {
-    return null;
-  }
-  if (!Number.isFinite(expiresAt) || expiresAt < Math.floor(Date.now() / 1000)) {
-    return null;
-  }
-
-  const payload = `${prefix}.${userId}.${expiresAtRaw}`;
-  return safeEqual(signature, sign(payload)) ? Number(userId) : null;
-};
-
-export const createAdminSessionCookie = () => {
-  const expiresAt = Math.floor(Date.now() / 1000) + SESSION_TTL_SECONDS;
-  const payload = `admin.${expiresAt}`;
-  const token = `${payload}.${sign(payload)}`;
-
-  return `${COOKIE_NAME}=${encodeURIComponent(token)}; Path=/; Max-Age=${SESSION_TTL_SECONDS}; HttpOnly; SameSite=Lax${
-    process.env.NODE_ENV === "production" ? "; Secure" : ""
-  }`;
-};
-
-export const clearAdminSessionCookie = () =>
-  `${COOKIE_NAME}=; Path=/; Max-Age=0; HttpOnly; SameSite=Lax${
-    process.env.NODE_ENV === "production" ? "; Secure" : ""
-  }`;
-
-export const isValidAdminSession = (cookieHeader?: string) => {
-  const rawCookie = cookieHeader
-    ?.split(";")
-    .map((item) => item.trim())
-    .find((item) => item.startsWith(`${COOKIE_NAME}=`));
-
-  if (!rawCookie) return false;
-
-  const token = decodeURIComponent(rawCookie.slice(COOKIE_NAME.length + 1));
-  const parts = token.split(".");
-  if (parts.length !== 3) return false;
-
-  const [subject, expiresAtRaw, signature] = parts;
-  const expiresAt = Number(expiresAtRaw);
-  if (subject !== "admin" || !Number.isFinite(expiresAt)) return false;
-  if (expiresAt < Math.floor(Date.now() / 1000)) return false;
-
-  return safeEqual(signature, sign(`${subject}.${expiresAtRaw}`));
-};
-
-export const requireAdminSession = (context: GetServerSidePropsContext) => {
-  if (isValidAdminSession(context.req.headers.cookie)) return null;
-
-  return {
-    redirect: {
-      destination: "/admin/login",
-      permanent: false,
-    },
-  };
-};
-
-export const setAdminSession = (res: NextApiResponse) => {
-  res.setHeader("Set-Cookie", createAdminSessionCookie());
-};
-
-export const clearAdminSession = (res: NextApiResponse) => {
-  res.setHeader("Set-Cookie", clearAdminSessionCookie());
-};
-
-export const requireAdminApiSession = (
-  req: NextApiRequest,
-  res: NextApiResponse,
-) => {
-  if (isValidAdminSession(req.headers.cookie)) return true;
+// API handlers run inside withAdminApi; the context cannot be supplied by a browser.
+export const requireAdminApiSession = (_req: NextApiRequest, res: NextApiResponse) => {
+  if (supportContext.getStore()) return true;
   res.status(401).json({ error: "admin_unauthorized" });
   return false;
 };

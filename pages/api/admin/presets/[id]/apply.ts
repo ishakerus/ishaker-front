@@ -1,3 +1,4 @@
+import { withAdminApi } from "../../../../../lib/admin/access";
 import crypto from "crypto";
 import type { NextApiRequest, NextApiResponse } from "next";
 import { requireAdminApiSession } from "../../../../../lib/admin/auth";
@@ -32,7 +33,7 @@ type Cell = {
   isActive?: boolean;
 };
 
-export default async function handler(
+async function handler(
   req: NextApiRequest,
   res: NextApiResponse,
 ) {
@@ -218,6 +219,8 @@ export default async function handler(
       });
     }
 
+    if (deletions.length) return res.status(403).json({ error: "support_cannot_delete", message: "Applying this preset would remove existing containers. Support can only create or update them." });
+
     await requestStrapiRestAsService(`/api/machines/${machineId}`, {
       method: "PUT",
       body: JSON.stringify({
@@ -283,3 +286,5 @@ export default async function handler(
     });
   }
 }
+
+export default withAdminApi(handler);

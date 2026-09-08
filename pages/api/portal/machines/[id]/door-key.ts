@@ -1,3 +1,4 @@
+import { withSupportPortalApi } from "../../../../../lib/admin/access";
 import type { NextApiRequest, NextApiResponse } from "next";
 import {
   consumeDoorKeyRateLimit,
@@ -15,7 +16,7 @@ const idFrom = (value: string | string[] | undefined) => {
   return id && /^\d+$/.test(id) ? id : "";
 };
 
-export default async function handler(
+async function handler(
   req: NextApiRequest,
   res: NextApiResponse,
 ) {
@@ -83,3 +84,5 @@ export default async function handler(
     scanner_ok: machine.fleet_status?.scanner_ok ?? null,
   });
 }
+
+export default withSupportPortalApi(handler);

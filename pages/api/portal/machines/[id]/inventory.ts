@@ -1,3 +1,4 @@
+import { withSupportPortalApi } from "../../../../../lib/admin/access";
 import type { NextApiRequest, NextApiResponse } from "next";
 import { withoutMachineNickname } from "../../../../../lib/portal/machinePrivacy";
 import {
@@ -11,7 +12,7 @@ const asId = (value: string | string[] | undefined) => {
   return id && /^\d+$/.test(id) ? id : "";
 };
 
-export default async function handler(req: NextApiRequest, res: NextApiResponse) {
+async function handler(req: NextApiRequest, res: NextApiResponse) {
   if (!['PUT'].includes(req.method || "")) {
     res.setHeader("Allow", ["PUT"]);
     return res.status(405).json({ error: "method_not_allowed" });
@@ -80,3 +81,5 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
     });
   }
 }
+
+export default withSupportPortalApi(handler);

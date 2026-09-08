@@ -9,7 +9,9 @@ import {
   withoutMachineNickname,
 } from "./machinePrivacy";
 import type { PortalSession, PortalUser } from "../../types/portal";
-import { readAdminImpersonationUserId } from "../admin/auth";
+import { resolveAdminSession } from "../admin/auth";
+import { supportContext } from "../admin/context";
+import { cabinetMatchesAdmin, hasSupportCabinet, readSupportCabinet } from "../admin/impersonation";
 import {
   requestStrapiRestAsService,
   requestStrapiRestWithJwt,
@@ -29,7 +31,7 @@ const parseCookie = (cookieHeader: string | undefined, name: string) => {
     .find((part) => part.startsWith(`${name}=`));
 
   if (!cookie) return null;
-  return decodeURIComponent(cookie.slice(name.length + 1));
+  try { return decodeURIComponent(cookie.slice(name.length + 1)); } catch { return null; }
 };
 
 export const createPortalSessionCookie = (jwt: string) =>
@@ -69,9 +71,9 @@ export const fetchPortalUser = async (jwt: string) => {
   }
 };
 
-const fetchPortalUserAsService = (userId: string | number) =>
-  requestStrapiRestAsService<PortalUser>(
-    `/api/users/${userId}?populate[0]=client&populate[1]=role`,
+const fetchPortalUserForSupport = (userId: string | number, jwt: string) =>
+  requestStrapiRestWithJwt<PortalUser>(
+    `/api/users/${userId}?populate[0]=client&populate[1]=role`, jwt,
   );
 
 const normalizeRoleKey = (value?: string) =>
@@ -80,6 +82,10 @@ const normalizeRoleKey = (value?: string) =>
 export const isProductClientUser = (user?: PortalUser | null) =>
   normalizeRoleKey(user?.role?.type) === "productclient" ||
   normalizeRoleKey(user?.role?.name) === "productclient";
+
+export const isClientCabinetUser = (user: PortalUser) =>
+  ["portalclient", "client"].includes(normalizeRoleKey(user.role?.type)) &&
+  Boolean(user.client?.id) && !user.blocked && user.confirmed !== false;
 
 const buildClientParams = (includeInventory: boolean) => {
   const params = new URLSearchParams();
@@ -177,14 +183,15 @@ export const resolvePortalSession = async (
   cookieHeader?: string,
 ): Promise<PortalSession | null> => {
   const credential = readPortalJwt(cookieHeader);
-  if (!credential) return null;
-
-  const impersonatedUserId = readAdminImpersonationUserId(credential);
+  const cabinet = readSupportCabinet(cookieHeader);
+  const admin = hasSupportCabinet(cookieHeader) ? await resolveAdminSession(cookieHeader) : null;
+  if (hasSupportCabinet(cookieHeader) && !cabinetMatchesAdmin(cabinet, admin)) return null;
+  if (!credential && !cabinet) return null;
   let user: PortalUser;
   try {
-    user = impersonatedUserId
-      ? await fetchPortalUserAsService(impersonatedUserId)
-      : await fetchPortalUser(credential);
+    user = cabinet
+      ? await fetchPortalUserForSupport(cabinet.targetUserId, admin!.jwt)
+      : await fetchPortalUser(credential!);
   } catch (error) {
     const status = (error as { status?: number }).status;
     // Expired, revoked, and pre-deployment cookies are simply signed-out
@@ -193,7 +200,12 @@ export const resolvePortalSession = async (
     if (status === 401 || status === 403) return null;
     throw error;
   }
-  if (!user?.id) return null;
+  if (!user?.id || user.blocked || user.confirmed === false) return null;
+  if (cabinet) {
+    if (Number(user.client?.id) !== cabinet.clientId || !isClientCabinetUser(user)) return null;
+    const machine = await fetchMachineByIdAsService(cabinet.machineId).catch(() => null);
+    if (Number(machine?.client?.id) !== cabinet.clientId) return null;
+  }
 
   if (!user.client?.id) {
     if (!isProductClientUser(user)) return null;
@@ -213,10 +225,11 @@ export const resolvePortalSession = async (
   try {
     const resolvedClient = await fetchClientById(user.client.id);
     if (!resolvedClient?.id) return null;
+    if (cabinet && resolvedClient.portal_access_enabled === false) return null;
     client = withoutPrivateClientFields(resolvedClient);
   } catch (error) {
     const status = (error as { status?: number }).status;
-    if (status === 404) return null;
+    if (status === 404 || cabinet) return null;
 
     console.error(
       "[portal] client details unavailable; keeping authenticated session:",
@@ -238,6 +251,8 @@ export const resolvePortalSession = async (
     client,
     machines: (client.machines || []) as Machine[],
     access: isProductClientUser(user) ? "product" : "client",
+    ...(cabinet && admin ? { support: { username: admin.username, userId: admin.id,
+      machineId: cabinet.machineId, expiresAt: cabinet.expiresAt } } : {}),
   };
 };
 
@@ -254,6 +269,7 @@ export const requirePortalSession = async (
   context: GetServerSidePropsContext,
 ): Promise<RequirePortalSessionResult> => {
   try {
+    context.res.setHeader("Cache-Control", "private, no-store");
     const session = await resolvePortalSession(context.req.headers.cookie);
     if (session) {
       if (
@@ -275,14 +291,14 @@ export const requirePortalSession = async (
 
   return {
     redirect: {
-      destination: "/login",
+      destination: hasSupportCabinet(context.req.headers.cookie) ? "/admin/dashboard" : "/login",
       permanent: false,
     },
   };
 };
 
 export const getPortalSessionFromApiRequest = async (req: NextApiRequest) => {
-  return resolvePortalSession(req.headers.cookie);
+  return supportContext.getStore()?.portalSession || resolvePortalSession(req.headers.cookie);
 };
 
 export const machineBelongsToSessionClient = (

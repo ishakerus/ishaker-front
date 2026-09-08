@@ -1,3 +1,5 @@
+import { supportContext } from "../../lib/admin/context";
+import { canSupportWriteStrapi } from "../../lib/admin/permissions";
 import fs from "fs";
 import path from "path";
 import { getStrapiBaseUrl } from "../fetchers";
@@ -186,6 +188,8 @@ export const requestStrapiAsService = async <T = any>(
   query: string,
   variables?: Record<string, any>,
 ) => {
+  const support = supportContext.getStore();
+  if (support) return requestGraphql<T>(query, variables, support.jwt);
   let jwt = await getStrapiJwt(false);
 
   try {
@@ -233,6 +237,15 @@ export const requestStrapiRestAsService = async <T = any>(
   path: string,
   init?: RequestInit,
 ) => {
+  const support = supportContext.getStore();
+  const method = (init?.method || "GET").toUpperCase();
+  if (support && !["GET", "HEAD"].includes(method)) {
+    if (!canSupportWriteStrapi(path, method)) {
+      throw Object.assign(new Error("This action is outside support permissions."), { status: 403 });
+    }
+    // Never retry a support write with the more privileged service account.
+    return requestStrapiRest<T>(path, init, support.jwt, true);
+  }
   let jwt = await getStrapiJwt(false);
 
   try {
@@ -251,6 +264,15 @@ export const requestStrapiRestPayloadAsService = async <T = any>(
   path: string,
   init?: RequestInit,
 ) => {
+  const support = supportContext.getStore();
+  const method = (init?.method || "GET").toUpperCase();
+  if (support && !["GET", "HEAD"].includes(method)) {
+    if (!canSupportWriteStrapi(path, method)) {
+      throw Object.assign(new Error("This action is outside support permissions."), { status: 403 });
+    }
+    // Never retry a support write with the more privileged service account.
+    return requestStrapiRest<T>(path, init, support.jwt, false);
+  }
   let jwt = await getStrapiJwt(false);
 
   try {
@@ -283,6 +305,9 @@ export const fetchStrapiCatalogEndpoint = async (
   path: string,
   init?: RequestInit,
 ) => {
+  if (supportContext.getStore() && !["GET", "HEAD"].includes((init?.method || "GET").toUpperCase())) {
+    throw Object.assign(new Error("Support cannot use device credentials to write."), { status: 403 });
+  }
   const catalogToken =
     process.env.CATALOG_TOKEN || localStrapiEnv.CATALOG_TOKEN;
   return fetch(`${getStrapiBaseUrl()}${path}`, {

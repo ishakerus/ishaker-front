@@ -1,6 +1,7 @@
+import { withSupportPortalApi } from "../../../../../lib/admin/access";
 import type { NextApiRequest, NextApiResponse } from "next";
 
-export default function handler(_req: NextApiRequest, res: NextApiResponse) {
+function handler(_req: NextApiRequest, res: NextApiResponse) {
   res.setHeader("Allow", []);
   return res.status(410).json({
     error: "deprecated_product_line_binding",
@@ -8,3 +9,5 @@ export default function handler(_req: NextApiRequest, res: NextApiResponse) {
       "Product lines are library records. Configure currency and products on the machine containers.",
   });
 }
+
+export default withSupportPortalApi(handler);

@@ -1,3 +1,4 @@
+import { withSupportPortalApi } from "../../../../lib/admin/access";
 import type { NextApiRequest, NextApiResponse } from "next";
 import { getPortalSessionFromApiRequest } from "../../../../lib/portal/auth";
 import { requestWithSplashOwnershipFallback } from "../../../../lib/portal/splashOwnership";
@@ -19,7 +20,7 @@ export const config = {
   },
 };
 
-export default async function handler(req: NextApiRequest, res: NextApiResponse) {
+async function handler(req: NextApiRequest, res: NextApiResponse) {
   if (req.method !== "POST") {
     res.setHeader("Allow", ["POST"]);
     return res.status(405).json({ error: "method_not_allowed" });
@@ -154,3 +155,5 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
     return res.status(500).json({ error: "taste_submission_failed", message });
   }
 }
+
+export default withSupportPortalApi(handler);

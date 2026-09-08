@@ -14,7 +14,7 @@ type DashboardProps = {
 };
 
 export const getServerSideProps: GetServerSideProps<DashboardProps> = async (context) => {
-  const redirect = requireAdminSession(context);
+  const redirect = await requireAdminSession(context);
   if (redirect) return redirect;
 
   try {

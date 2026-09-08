@@ -1,4 +1,5 @@
 import "../styles/globals.css";
+import { SupportSessionBanner } from "../components/admin/SupportSessionBanner";
 import type { AppProps } from "next/app";
 import { ChakraProvider } from "@chakra-ui/react";
 import { DefaultSeo } from "next-seo";
@@ -44,6 +45,7 @@ function MyApp({ Component, pageProps }: AppProps) {
             }}
           />
           <RouteLoadingOverlay />
+          <SupportSessionBanner session={pageProps.session} />
           <Component {...pageProps} />
           <Footer />
         </ChakraProvider>

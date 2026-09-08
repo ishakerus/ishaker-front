@@ -1,3 +1,4 @@
+import { withSupportPortalApi } from "../../../../lib/admin/access";
 import { execFile } from "child_process";
 import { promises as fs } from "fs";
 import os from "os";
@@ -38,7 +39,7 @@ export const config = {
   },
 };
 
-export default async function handler(req: NextApiRequest, res: NextApiResponse) {
+async function handler(req: NextApiRequest, res: NextApiResponse) {
   if (req.method !== "POST") {
     res.setHeader("Allow", ["POST"]);
     return res.status(405).json({ error: "method_not_allowed" });
@@ -198,3 +199,5 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
     }
   }
 }
+
+export default withSupportPortalApi(handler);

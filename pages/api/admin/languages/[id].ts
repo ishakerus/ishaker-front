@@ -1,3 +1,4 @@
+import { withAdminApi } from "../../../../lib/admin/access";
 import type { NextApiRequest, NextApiResponse } from "next";
 import { requireAdminApiSession } from "../../../../lib/admin/auth";
 import {
@@ -18,7 +19,7 @@ const sortOrder = (value: unknown) => {
   return Number.isInteger(parsed) ? parsed : null;
 };
 
-export default async function handler(
+async function handler(
   req: NextApiRequest,
   res: NextApiResponse,
 ) {
@@ -82,3 +83,5 @@ export default async function handler(
     return res.status(500).json({ error: "language_request_failed" });
   }
 }
+
+export default withAdminApi(handler);

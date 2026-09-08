@@ -29,6 +29,8 @@ export type RegistrationDraft = {
 
 export type PortalUser = {
   id: number;
+  blocked?: boolean;
+  confirmed?: boolean;
   username?: string;
   email: string;
   client?: {
@@ -42,6 +44,7 @@ export type PortalUser = {
 };
 
 export type PortalSession = {
+  support?: { username: string; userId: number; machineId: number; expiresAt: number };
   user: PortalUser;
   client: Client;
   machines: Machine[];

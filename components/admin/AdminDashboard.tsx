@@ -19,6 +19,7 @@ import {
   Tooltip,
   Tr,
   VStack,
+  useToast,
 } from "@chakra-ui/react";
 import { NextSeo } from "next-seo";
 import Link from "next/link";
@@ -78,6 +79,20 @@ export function AdminDashboard({
   loadError,
   readinessReferenceTime,
 }: AdminDashboardProps) {
+  const toast = useToast();
+  const [openingMachine, setOpeningMachine] = useState<string | null>(null);
+  const openCabinet = async (machine: Machine) => {
+    setOpeningMachine(String(machine.id));
+    try {
+      const response = await fetch(`/api/admin/machines/${machine.id}/cabinet`, { method: "POST" });
+      const payload = await response.json();
+      if (!response.ok) throw new Error(payload.message || "Unable to open the client cabinet.");
+      window.location.href = payload.redirect;
+    } catch (error) {
+      toast({ title: (error as Error).message, status: "error", duration: 6000, isClosable: true });
+      setOpeningMachine(null);
+    }
+  };
   const [search, setSearch] = useState("");
   const [verdictFilter, setVerdictFilter] = useState("");
   const [failedCheckFilter, setFailedCheckFilter] = useState("");
@@ -388,9 +403,13 @@ export function AdminDashboard({
                         _hover={{ bg: "whiteAlpha.50" }}
                       >
                         <Td py="2.5">
-                          <Text color="bg.50" fontWeight="800" noOfLines={1}>
+                          <Button variant="link" color="acid.300" fontWeight="800"
+                            onClick={() => openCabinet(machine)}
+                            isDisabled={!machine.client?.id || openingMachine !== null}
+                            isLoading={openingMachine === String(machine.id)}
+                            title={machine.client?.id ? "Open client cabinet as support" : "No client assigned"}>
                             {machineName(machine)}
-                          </Text>
+                          </Button>
                           <Text color="bg.500" fontSize="xs">
                             ID {machine.id}
                           </Text>

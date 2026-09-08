@@ -1,8 +1,9 @@
+import { withAdminApi } from "../../../../lib/admin/access";
 import type { NextApiRequest, NextApiResponse } from "next";
 import { requireAdminApiSession } from "../../../../lib/admin/auth";
 import { requestStrapiRestAsService } from "../../../../services/server/strapiClient";
 
-export default async function handler(
+async function handler(
   req: NextApiRequest,
   res: NextApiResponse,
 ) {
@@ -26,15 +27,8 @@ export default async function handler(
     const existing: any[] = await requestStrapiRestAsService(
       `/api/translation-entries?filters[translation][id][$eq]=${translationId}&filters[language][id][$eq]=${languageId}&pagination[pageSize]=1`,
     );
-    if (!value) {
-      if (existing[0]) {
-        await requestStrapiRestAsService(
-          `/api/translation-entries/${existing[0].id}`,
-          { method: "DELETE" },
-        );
-      }
-      return res.status(200).json({ entry: null });
-    }
+    if (!value && existing[0]) return res.status(403).json({ error: "support_cannot_delete", message: "Support cannot remove an existing translation." });
+    if (!value) return res.status(200).json({ entry: null });
     const entry = await requestStrapiRestAsService(
       existing[0]
         ? `/api/translation-entries/${existing[0].id}`
@@ -58,3 +52,5 @@ export default async function handler(
     return res.status(500).json({ error: "translation_entry_save_failed" });
   }
 }
+
+export default withAdminApi(handler);

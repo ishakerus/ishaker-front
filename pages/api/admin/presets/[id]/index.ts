@@ -1,3 +1,4 @@
+import { withAdminApi } from "../../../../../lib/admin/access";
 import type { NextApiRequest, NextApiResponse } from "next";
 import { requireAdminApiSession } from "../../../../../lib/admin/auth";
 import { requestStrapiRestAsService } from "../../../../../services/server/strapiClient";
@@ -17,7 +18,7 @@ const relationId = (value: unknown) => {
   return /^\d+$/.test(id) ? Number(id) : null;
 };
 
-export default async function handler(
+async function handler(
   req: NextApiRequest,
   res: NextApiResponse,
 ) {
@@ -79,6 +80,14 @@ export default async function handler(
         message:
           "Every assigned product must be complete, active, and match its container category.",
       });
+    }
+
+    const submittedExistingIds = new Set(cells.map((cell) => cell.cellId));
+    if (existingCells.some((cell) => !submittedExistingIds.has(Number(cell.id)))) {
+      return res.status(403).json({ error: "support_cannot_delete", message: "Support can edit or disable preset rows, but cannot remove them." });
+    }
+    if (cells.some((cell) => cell.cellId !== null && !existingCells.some((existing) => Number(existing.id) === cell.cellId))) {
+      return res.status(403).json({ error: "preset_cell_access_denied" });
     }
 
     await requestStrapiRestAsService(`/api/presets/${presetId}`, {
@@ -148,3 +157,5 @@ export default async function handler(
     return res.status(500).json({ error: "preset_request_failed" });
   }
 }
+
+export default withAdminApi(handler);

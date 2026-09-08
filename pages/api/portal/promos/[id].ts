@@ -1,3 +1,4 @@
+import { withSupportPortalApi } from "../../../../lib/admin/access";
 import type { NextApiRequest, NextApiResponse } from "next";
 import { getPortalSessionFromApiRequest } from "../../../../lib/portal/auth";
 import { requestStrapiRestAsService } from "../../../../services/server/strapiClient";
@@ -8,7 +9,7 @@ const promoIdFrom = (value: string | string[] | undefined) => {
   return id && /^\d+$/.test(id) ? id : "";
 };
 
-export default async function handler(req: NextApiRequest, res: NextApiResponse) {
+async function handler(req: NextApiRequest, res: NextApiResponse) {
   if (req.method !== "PATCH") {
     res.setHeader("Allow", ["PATCH"]);
     return res.status(405).json({ error: "method_not_allowed" });
@@ -58,3 +59,5 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
     });
   }
 }
+
+export default withSupportPortalApi(handler);

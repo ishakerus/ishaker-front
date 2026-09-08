@@ -1,3 +1,4 @@
+import { withSupportPortalApi } from "../../../lib/admin/access";
 import type { NextApiRequest, NextApiResponse } from "next";
 import {
   fetchPortalUser,
@@ -5,7 +6,7 @@ import {
   setPortalSession,
 } from "../../../lib/portal/auth";
 
-export default async function handler(req: NextApiRequest, res: NextApiResponse) {
+async function handler(req: NextApiRequest, res: NextApiResponse) {
   if (req.method !== "POST") {
     res.setHeader("Allow", ["POST"]);
     return res.status(405).json({ error: "method_not_allowed" });
@@ -33,3 +34,5 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
     return res.status(401).json({ error: "oauth_login_failed" });
   }
 }
+
+export default withSupportPortalApi(handler);

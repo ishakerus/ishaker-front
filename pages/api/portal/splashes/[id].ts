@@ -1,10 +1,11 @@
+import { withSupportPortalApi } from "../../../../lib/admin/access";
 import type { NextApiRequest, NextApiResponse } from "next";
 import { getPortalSessionFromApiRequest } from "../../../../lib/portal/auth";
 import { requestWithSplashOwnershipFallback } from "../../../../lib/portal/splashOwnership";
 import { requestStrapiRestAsService } from "../../../../services/server/strapiClient";
 import type { PortalSplash } from "../../../../types/portal";
 
-export default async function handler(req: NextApiRequest, res: NextApiResponse) {
+async function handler(req: NextApiRequest, res: NextApiResponse) {
   if (req.method !== "GET") {
     res.setHeader("Allow", ["GET"]);
     return res.status(405).json({ error: "method_not_allowed" });
@@ -55,3 +56,5 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
     return res.status(404).json({ error: "splash_not_found" });
   }
 }
+
+export default withSupportPortalApi(handler);

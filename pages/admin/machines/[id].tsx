@@ -112,7 +112,7 @@ export default function AdminMachineReadinessPage({
 export const getServerSideProps: GetServerSideProps<
   AdminMachineReadinessPageProps
 > = async (context) => {
-  const redirect = requireAdminSession(context);
+  const redirect = await requireAdminSession(context);
   if (redirect) return redirect;
 
   const machineId = Array.isArray(context.params?.id)

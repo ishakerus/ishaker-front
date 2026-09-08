@@ -169,7 +169,7 @@ export default function AdminLanguagesPage() {
           </HStack>
           <HStack mt="6">
             <Button variant="primary" onClick={save} isLoading={isSaving} isDisabled={!form.code.trim() || !form.name.trim()}>Save language</Button>
-            {form.id ? <Button colorScheme="red" variant="outline" onClick={remove}>Delete</Button> : null}
+            {form.id ? <Button colorScheme="red" variant="outline" onClick={remove} isDisabled title="Support cannot delete records">Delete</Button> : null}
           </HStack>
         </Box>
       </SimpleGrid>
@@ -178,6 +178,6 @@ export default function AdminLanguagesPage() {
 }
 
 export const getServerSideProps: GetServerSideProps = async (context) => {
-  const redirect = requireAdminSession(context);
+  const redirect = await requireAdminSession(context);
   return redirect || { props: {} };
 };

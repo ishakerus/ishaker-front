@@ -1,3 +1,4 @@
+import { withSupportPortalApi } from "../../../../lib/admin/access";
 import type { NextApiRequest, NextApiResponse } from "next";
 import {
   assertMachineBelongsToSessionClient,
@@ -32,7 +33,7 @@ const getErrorPayload = (error: unknown) => {
   };
 };
 
-export default async function handler(req: NextApiRequest, res: NextApiResponse) {
+async function handler(req: NextApiRequest, res: NextApiResponse) {
   const session = await getPortalSessionFromApiRequest(req);
 
   if (!session) {
@@ -149,3 +150,5 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
   res.setHeader("Allow", ["POST"]);
   return res.status(405).json({ error: "method_not_allowed" });
 }
+
+export default withSupportPortalApi(handler);

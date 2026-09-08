@@ -1,3 +1,4 @@
+import { withAdminApi } from "../../../../lib/admin/access";
 import type { NextApiRequest, NextApiResponse } from "next";
 import { requireAdminApiSession } from "../../../../lib/admin/auth";
 import { getMachineContainerCount } from "../../../../lib/portal/containerSlots";
@@ -114,7 +115,7 @@ const presetPopulateQuery =
   "populate[product_line]=*&populate[cells][populate][product][populate][dosage]=*&" +
   "sort[0]=name:ASC&pagination[pageSize]=2000";
 
-export default async function handler(
+async function handler(
   req: NextApiRequest,
   res: NextApiResponse,
 ) {
@@ -256,3 +257,5 @@ export {
   parseCells,
   presetPopulateQuery,
 };
+
+export default withAdminApi(handler);
