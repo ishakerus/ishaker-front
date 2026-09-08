@@ -2,7 +2,13 @@ import test from "node:test";
 import assert from "node:assert/strict";
 import { createAdminSession, createAdminSessionCookie, resolveAdminSession, type SupportUser } from "./auth";
 import { createSupportCabinetCookie, readSupportCabinet, cabinetMatchesAdmin } from "./impersonation";
-import { isSameOriginRequest } from "./http";
+import {
+  clearLoginFailures,
+  isLoginRateLimited,
+  isSameOriginRequest,
+  loginAttemptKey,
+  recordLoginFailure,
+} from "./http";
 import { canSupportUseRoute, canSupportWriteStrapi } from "./permissions";
 import { supportContext } from "./context";
 import { requestStrapiRestAsService } from "../../services/server/strapiClient";
@@ -94,6 +100,22 @@ test('mutations require a matching origin', () => {
   assert.equal(isSameOriginRequest(req as any), true);
   assert.equal(isSameOriginRequest({ ...req, headers: { ...req.headers, origin: "https://attacker.example" } } as any), false);
   assert.equal(isSameOriginRequest({ ...req, headers: { host: "example.com" } } as any), false);
+});
+
+test('login throttling isolates source addresses and clears after success', () => {
+  const first = loginAttemptKey(
+    { headers: { "x-forwarded-for": "198.51.100.10, 10.0.0.1" }, socket: {} } as any,
+    "Artur.Support",
+  );
+  const second = loginAttemptKey(
+    { headers: { "x-forwarded-for": "198.51.100.11" }, socket: {} } as any,
+    "artur.support",
+  );
+  for (let index = 0; index < 10; index += 1) recordLoginFailure(first);
+  assert.equal(isLoginRateLimited(first), true);
+  assert.equal(isLoginRateLimited(second), false);
+  clearLoginFailures(first);
+  assert.equal(isLoginRateLimited(first), false);
 });
 
 test('writes use the support JWT and never fall back to the service account', async (t) => {

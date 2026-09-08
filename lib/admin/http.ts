@@ -15,12 +15,27 @@ export const isSameOriginRequest = (req: NextApiRequest) => {
 };
 
 const attempts = new Map<string, { count: number; until: number }>();
-export const consumeLoginAttempt = (identifier: string) => {
+
+export const loginAttemptKey = (req: NextApiRequest, identifier: string) => {
+  const forwarded = req.headers["x-forwarded-for"];
+  const forwardedIp = Array.isArray(forwarded) ? forwarded[0] : forwarded;
+  const ip = forwardedIp?.split(",")[0]?.trim() || req.socket.remoteAddress || "unknown";
+  return `${ip}:${identifier.trim().toLowerCase()}`;
+};
+
+export const isLoginRateLimited = (key: string) => {
   const now = Date.now();
-  for (const [key, value] of attempts) if (value.until <= now) attempts.delete(key);
-  const key = identifier.toLowerCase();
+  for (const [entryKey, value] of attempts) {
+    if (value.until <= now) attempts.delete(entryKey);
+  }
+  return (attempts.get(key)?.count || 0) >= 10;
+};
+
+export const recordLoginFailure = (key: string) => {
+  const now = Date.now();
   const current = attempts.get(key) || { count: 0, until: now + 15 * 60_000 };
   current.count++;
   attempts.set(key, current);
-  return current.count <= 10;
 };
+
+export const clearLoginFailures = (key: string) => attempts.delete(key);
