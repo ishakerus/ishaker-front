@@ -324,42 +324,6 @@ export function AdminDashboard({
                   size="sm"
                 />
               </FormControl>
-              <FormControl>
-                <FormLabel color="bg.400" fontSize="xs" mb="1">
-                  Verdict
-                </FormLabel>
-                <Select
-                  value={verdictFilter}
-                  onChange={(event) => setVerdictFilter(event.target.value)}
-                  bg="bg.800"
-                  size="sm"
-                >
-                  <option value="">All verdicts</option>
-                  <option value="SHIP">Ready to ship</option>
-                  <option value="REVIEW">Review</option>
-                  <option value="DO_NOT_SHIP">Do not ship</option>
-                </Select>
-              </FormControl>
-              <FormControl>
-                <FormLabel color="bg.400" fontSize="xs" mb="1">
-                  Failed check
-                </FormLabel>
-                <Select
-                  value={failedCheckFilter}
-                  onChange={(event) => setFailedCheckFilter(event.target.value)}
-                  bg="bg.800"
-                  size="sm"
-                >
-                  <option value="">All failed checks</option>
-                  {readinessSummary.frequentFailures.map(
-                    ([checkId, occurrences]) => (
-                      <option key={checkId} value={checkId}>
-                        {checkId} ({occurrences.length})
-                      </option>
-                    ),
-                  )}
-                </Select>
-              </FormControl>
             </SimpleGrid>
           </Box>
 
