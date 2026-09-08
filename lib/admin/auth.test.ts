@@ -79,11 +79,13 @@ test('admin cookie encrypts the JWT and revalidates identity, role, block and ac
   assert.equal(await resolveAdminSession(altered), null);
 });
 
-test('cabinet grants expire after 30 minutes and are bound to the exact support login', () => {
+test('cabinet grants last up to two hours and are bound to the exact support login', () => {
   const admin = session();
+  const createdAt = Date.now();
   const cabinet = readSupportCabinet(createSupportCabinetCookie(admin, { targetUserId: 15, clientId: 23, machineId: 9 }));
   assert.equal(cabinet?.targetUserId, 15);
-  assert.ok(cabinet!.expiresAt <= Date.now() + 30 * 60_000);
+  assert.ok(cabinet!.expiresAt > createdAt + 119 * 60_000);
+  assert.ok(cabinet!.expiresAt <= Date.now() + 2 * 60 * 60_000);
   assert.equal(cabinetMatchesAdmin(cabinet, admin), true);
   assert.equal(cabinetMatchesAdmin(cabinet, null), false);
   assert.equal(cabinetMatchesAdmin(cabinet, { ...admin, sid: "another-login" }), false);

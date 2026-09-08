@@ -3,7 +3,7 @@ import { seal, unseal } from "../admin/cookies";
 
 const PREFIX = "shared-admin.";
 const PURPOSE = "shared-admin-portal";
-const TTL_MS = 30 * 60_000;
+const TTL_MS = 2 * 60 * 60_000;
 
 type SharedAdminPortalGrant = {
   targetUserId: number;

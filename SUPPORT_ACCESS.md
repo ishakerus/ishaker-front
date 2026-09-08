@@ -17,7 +17,7 @@ Existing admin currency, preset and localization editors remain available. Produ
 
 Set `ADMIN_SESSION_SECRET` to at least 32 random characters, for example the output of `openssl rand -base64 48`. Keep it server-side, stable across restarts and identical across frontend instances. Rotating it signs out every support session. During migration, an existing `ADMIN_PASSWORD` is accepted only as this encryption-key fallback; it is never accepted as a login credential. Optionally set `APP_ORIGIN` to the canonical frontend origin; otherwise mutation Origin checks compare against the request Host.
 
-`ADMIN_PASSWORD` no longer authenticates the dashboard. For backward compatibility, `/login` still accepts a client nickname/email with `ADMIN_PASSWORD` and creates a 30-minute encrypted client-portal grant. Changing or removing `ADMIN_PASSWORD` invalidates those grants. The frontend still needs its existing Strapi service credentials for client-scoped reads.
+`ADMIN_PASSWORD` no longer authenticates the dashboard. For backward compatibility, `/login` still accepts a client nickname/email with `ADMIN_PASSWORD` and creates a 2-hour encrypted client-portal grant. Changing or removing `ADMIN_PASSWORD` invalidates those grants. The frontend still needs its existing Strapi service credentials for client-scoped reads.
 
 ## Creating another support user
 
@@ -29,7 +29,7 @@ Alternatively, from the backend project directory, pass a JSON object with `user
 
 Click **Cabinet** in the machine row's Action column. The button is disabled when the assigned client has no active cabinet login. A POST endpoint derives the client and active client user from the machine; the browser supplies only the machine ID and the server rechecks availability. A machine must be assigned to a client with an enabled cabinet and an active client login.
 
-The frontend issues a separate encrypted, HttpOnly support cookie for at most 30 minutes, capped by the 8-hour support login. No reusable password or credential is included in a URL or page props. The support cookie is tied to the exact support login. Every request rechecks the support user, role, blocked state, account update timestamp, target client user, and the selected machine's client assignment. Expired access returns to the dashboard. **Exit to dashboard** clears cabinet access while preserving the support login. A pre-existing normal client cookie is not replaced when opening a support cabinet.
+The frontend issues a separate encrypted, HttpOnly support cookie for at most 2 hours, capped by the 8-hour support login. No reusable password or credential is included in a URL or page props. The support cookie is tied to the exact support login. Every request rechecks the support user, role, blocked state, account update timestamp, target client user, and the selected machine's client assignment. Expired access returns to the dashboard. **Exit to dashboard** clears cabinet access while preserving the support login. A pre-existing normal client cookie is not replaced when opening a support cabinet.
 
 The client cabinet keeps its client ownership checks. Support mutations additionally run with the support user's own Strapi JWT and an explicit content-operation allowlist. They never retry with service credentials. Support cannot use cabinet access to update the client's credentials or perform operations beyond the support role. Removing translation overrides or preset rows counts as deletion and is refused before changes are made.
 

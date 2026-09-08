@@ -2,7 +2,7 @@ import type { SupportIdentity } from "./context";
 import { readCookie, seal, sessionCookie, unseal } from "./cookies";
 
 export const SUPPORT_COOKIE = "ishaker_support_cabinet";
-export const SUPPORT_TTL_SECONDS = 30 * 60;
+export const SUPPORT_TTL_SECONDS = 2 * 60 * 60;
 export type CabinetSession = {
   sid: string;
   supportUserId: number;
