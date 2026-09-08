@@ -35,6 +35,7 @@ export type PortalUser = {
   email: string;
   client?: {
     id: string | number;
+    portal_access_enabled?: boolean;
   } | null;
   role?: {
     id: string | number;

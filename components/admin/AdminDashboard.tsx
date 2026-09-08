@@ -175,6 +175,7 @@ export function AdminDashboard({
       return [
         machine.id,
         machine.title,
+        machine.nickname,
         machine.serial_number,
         machine.anydesk_id,
         machine.client?.company,
@@ -395,6 +396,7 @@ export function AdminDashboard({
               <Table size="sm" variant="simple">
                 <Thead bg="whiteAlpha.50">
                   <Tr>
+                    <Th>Nickname</Th>
                     <Th>Client</Th>
                     <Th>Serial</Th>
                     <Th>AnyDesk</Th>
@@ -419,6 +421,9 @@ export function AdminDashboard({
                           bg: isOffline ? "blackAlpha.400" : "whiteAlpha.50",
                         }}
                       >
+                        <Td color="bg.100" fontWeight="700" py="2.5">
+                          {machine.nickname || "—"}
+                        </Td>
                         <Td color="bg.300" py="2.5">
                           {machine.client?.company || "Unassigned"}
                         </Td>

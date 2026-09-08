@@ -111,6 +111,7 @@ export const AdminMachinesQuery = `
         id
         attributes {
           title
+          nickname
           anydesk_id
           serial_number
           readiness

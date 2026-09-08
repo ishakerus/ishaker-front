@@ -7,7 +7,6 @@ import normalize from "../../services/normalizer";
 import { AdminClientsQuery, AdminMachinesQuery } from "../../services/queries";
 import type { Client, Machine } from "../../types/strapi";
 import type { PortalUser } from "../../types/portal";
-import { isClientCabinetUser } from "../../lib/portal/auth";
 
 type DashboardProps = {
   clients: Client[];
@@ -38,7 +37,16 @@ export const getServerSideProps: GetServerSideProps<DashboardProps> = async (con
     const cabinetClientIds = Array.from(
       new Set(
         users
-          .filter(isClientCabinetUser)
+          // The service role may filter users by their linked client but does
+          // not expose role relations in its response. The cabinet endpoint
+          // performs the authoritative role check again with the support JWT.
+          .filter(
+            (user) =>
+              Boolean(user.client?.id) &&
+              !user.blocked &&
+              user.confirmed !== false &&
+              user.client?.portal_access_enabled !== false,
+          )
           .map((user) => Number(user.client!.id)),
       ),
     );
