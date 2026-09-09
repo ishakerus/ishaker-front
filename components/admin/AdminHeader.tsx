@@ -29,7 +29,7 @@ const adminLinks = [
 export function AdminHeader({ title = "Client machines" }: { title?: string }) {
   const logout = async () => {
     await fetch("/api/admin/logout", { method: "POST" });
-    window.location.href = "/admin/login";
+    window.location.href = "/login";
   };
 
   return (

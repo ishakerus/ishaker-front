@@ -67,8 +67,15 @@ export default function LoginPage() {
         );
         return;
       }
+      const payload = await response.json().catch(() => null);
+      if (payload?.role === "support") {
+        await router.replace(payload.redirectTo || "/admin");
+        return;
+      }
       await router.replace(
-        router.query.reason === "nickname-exists" ? "/step1" : "/machines",
+        router.query.reason === "nickname-exists"
+          ? "/step1"
+          : payload?.redirectTo || "/machines",
       );
     } catch {
       setError("The portal is temporarily unavailable. Please try again.");
@@ -129,7 +136,7 @@ export default function LoginPage() {
                     textTransform="uppercase"
                     mb="5"
                   >
-                    Admin Panel
+                    Client Panel
                   </Text>
                   <Heading
                     as="h1"

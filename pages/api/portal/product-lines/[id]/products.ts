@@ -596,9 +596,6 @@ async function handler(req: NextApiRequest, res: NextApiResponse) {
     const customComponents = submittedComponents.filter(
       (component) => !component.componentId,
     );
-    if (session.support && customComponents.length) {
-      return res.status(403).json({ error: "support_permission_denied", message: "Support must select existing nutrition components when editing products." });
-    }
     const createdCustomComponents = await Promise.all(
       customComponents.map((component) =>
         requestStrapiRestAsService<CatalogComponent>("/api/components", {

@@ -1,6 +1,6 @@
 import test from "node:test";
 import assert from "node:assert/strict";
-import { createAdminSession, createAdminSessionCookie, resolveAdminSession, type SupportUser } from "./auth";
+import { createAdminSession, createAdminSessionCookie, requireAdminSession, resolveAdminSession, type SupportUser } from "./auth";
 import { createSupportCabinetCookie, readSupportCabinet, cabinetMatchesAdmin } from "./impersonation";
 import {
   createSharedAdminPortalToken,
@@ -20,6 +20,7 @@ import { requestStrapiRestAsService } from "../../services/server/strapiClient";
 import { withAdminApi, withSupportPortalApi } from "./access";
 import fs from "node:fs/promises";
 import path from "node:path";
+import portalLoginHandler from "../../pages/api/portal/login";
 
 process.env.ADMIN_SESSION_SECRET = "test-only-session-key-with-more-than-32-characters";
 const user: SupportUser = { id: 7, username: "Artur", updatedAt: "2026-09-07T12:00:00.000Z", blocked: false, confirmed: true, role: { type: "support" } };
@@ -93,19 +94,30 @@ test('cabinet grants last up to two hours and are bound to the exact support log
   assert.equal(readSupportCabinet(createSupportCabinetCookie({ ...admin, expiresAt: Date.now() - 1 }, { targetUserId: 15, clientId: 23, machineId: 9 })), null);
 });
 
-test('support allows content edits while denying deletion, account changes, physical access and device credentials', () => {
+test('support matches client portal mutations while retaining admin-only boundaries', () => {
   for (const collection of ['machines','currencies','presets','languages','translations','translation-entries','translation-sets','voice-clips','products','product-lines','tutorials']) {
     assert.ok(canSupportWriteStrapi(`/api/${collection}`, "POST"));
     assert.ok(canSupportWriteStrapi(`/api/${collection}/1`, "PUT"));
-    assert.equal(canSupportWriteStrapi(`/api/${collection}/1`, "DELETE"), false);
   }
-  for (const path of ["/api/users/1", "/api/clients/1", "/api/promo-codes/1", "/api/components/1", "/api/roles/1"]) assert.equal(canSupportWriteStrapi(path, "PUT"), false);
-  assert.equal(canSupportUseRoute("/api/portal/nayax-settings", "PUT", "portal"), false);
-  assert.equal(canSupportUseRoute("/api/portal/register-machine", "POST", "portal"), false);
-  assert.equal(canSupportUseRoute("/api/portal/promos/1", "PUT", "portal"), false);
-  assert.equal(canSupportUseRoute("/api/portal/machines/1/door-key", "POST", "portal"), false);
+  for (const collection of ['machine-cells','preset-cells','products','product-lines','translation-entries']) {
+    assert.equal(canSupportWriteStrapi(`/api/${collection}/1`, "DELETE"), true);
+  }
+  for (const collection of ['clients','promo-codes','components','tastes','splashes','circles','portal-registration-requests','door-accesses']) {
+    assert.equal(canSupportWriteStrapi(`/api/${collection}`, "POST"), true);
+  }
+  for (const path of ["/api/users/1", "/api/roles/1", "/api/creds/1"]) {
+    assert.equal(canSupportWriteStrapi(path, "PUT"), false);
+  }
+  assert.equal(canSupportWriteStrapi("/api/clients/1", "DELETE"), false);
+  assert.equal(canSupportUseRoute("/api/portal/nayax-settings", "PUT", "portal"), true);
+  assert.equal(canSupportUseRoute("/api/portal/register-machine", "POST", "portal"), true);
+  assert.equal(canSupportUseRoute("/api/portal/promos/1", "PATCH", "portal"), true);
+  assert.equal(canSupportUseRoute("/api/portal/machines/1/door-key", "POST", "portal"), true);
+  assert.equal(canSupportUseRoute("/api/portal/product-lines/1", "DELETE", "portal"), true);
   assert.equal(canSupportUseRoute("/api/admin/machines/1/door-key", "POST", "admin"), false);
+  assert.equal(canSupportUseRoute("/api/admin/product-lines/1", "DELETE", "admin"), false);
   assert.equal(canSupportUseRoute("/api/portal/product-lines/1/products/2", "PATCH", "portal"), true);
+  assert.equal(canSupportUseRoute("/api/not-portal/products/1", "DELETE", "portal"), false);
 });
 
 test('mutations require a matching origin', () => {
@@ -131,6 +143,63 @@ test('login throttling isolates source addresses and clears after success', () =
   assert.equal(isLoginRateLimited(first), false);
 });
 
+test('the shared login routes support to admin and clients to their portal', async (t) => {
+  let authenticatedUser: any = user;
+  t.mock.method(globalThis, "fetch", async (url: any) => {
+    const target = String(url);
+    if (target.endsWith("/api/auth/local")) {
+      return new Response(JSON.stringify({ jwt: "role-jwt" }));
+    }
+    if (target.includes("/api/users/me")) {
+      return new Response(JSON.stringify(authenticatedUser));
+    }
+    if (target.includes("/api/support-audits/record")) {
+      return new Response(JSON.stringify({ data: { id: 1, attributes: {} } }));
+    }
+    return new Response(JSON.stringify({ error: "unexpected_request" }), { status: 500 });
+  });
+
+  const request = {
+    method: "POST",
+    url: "/api/portal/login",
+    headers: { host: "localhost", origin: "http://localhost" },
+    socket: {},
+    body: { identifier: "support@example.com", password: "password" },
+  };
+  const supportResponse = response();
+  await portalLoginHandler(request as any, supportResponse as any);
+  assert.equal(supportResponse.statusCode, 200);
+  assert.equal(supportResponse.body.role, "support");
+  assert.equal(supportResponse.body.redirectTo, "/admin");
+  assert.ok((supportResponse.headers["Set-Cookie"] as string[]).some((value) => value.startsWith("ishaker_admin_session=")));
+
+  authenticatedUser = {
+    id: 18,
+    username: "client",
+    email: "client@example.com",
+    updatedAt: "2026-09-09T12:00:00.000Z",
+    blocked: false,
+    confirmed: true,
+    role: { type: "portal_client" },
+    client: { id: 23, portal_access_enabled: true },
+  };
+  request.body.identifier = "client@example.com";
+  const clientResponse = response();
+  await portalLoginHandler(request as any, clientResponse as any);
+  assert.equal(clientResponse.statusCode, 200);
+  assert.equal(clientResponse.body.role, "client");
+  assert.equal(clientResponse.body.redirectTo, "/machines");
+  assert.ok((clientResponse.headers["Set-Cookie"] as string[]).some((value) => value.startsWith("ishaker_portal_session=")));
+});
+
+test('protected admin pages send signed-out users to the shared login', async () => {
+  const result = await requireAdminSession({
+    req: { headers: {} },
+    res: { setHeader() {} },
+  } as any);
+  assert.equal(result?.redirect.destination, "/login");
+});
+
 test('writes use the support JWT and never fall back to the service account', async (t) => {
   const calls: RequestInit[] = [];
   t.mock.method(globalThis, "fetch", async (_url: any, init: RequestInit) => {
@@ -139,10 +208,12 @@ test('writes use the support JWT and never fall back to the service account', as
   });
   await supportContext.run(session(), async () => {
     await assert.rejects(requestStrapiRestAsService("/api/products/1", { method: "PUT", body: "{}" }), { status: 403 });
+    await assert.rejects(requestStrapiRestAsService("/api/products/1", { method: "DELETE" }), { status: 403 });
     await assert.rejects(requestStrapiRestAsService("/api/users/1", { method: "PUT", body: "{}" }), { status: 403 });
   });
-  assert.equal(calls.length, 1);
+  assert.equal(calls.length, 2);
   assert.equal((calls[0].headers as any).Authorization, "Bearer support-jwt");
+  assert.equal((calls[1].headers as any).Authorization, "Bearer support-jwt");
 });
 
 test('concurrent requests keep their own support credentials', async (t) => {
@@ -189,7 +260,7 @@ test('every admin and portal API keeps its support authorization wrapper', async
     const base = path.resolve('pages/api', scope);
     for (const file of (await walk(base)).filter((file) => file.endsWith('.ts'))) {
       const relative = path.relative(base, file);
-      const exceptions = scope === 'admin' ? ['login.ts', 'logout.ts', 'cabinet/exit.ts'] : ['logout.ts'];
+      const exceptions = scope === 'admin' ? ['login.ts', 'logout.ts', 'cabinet/exit.ts'] : ['login.ts', 'logout.ts'];
       if (exceptions.includes(relative)) continue;
       const contents = await fs.readFile(file, 'utf8');
       const wrapper = scope === 'admin' ? 'withAdminApi' : 'withSupportPortalApi';

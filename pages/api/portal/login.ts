@@ -1,11 +1,15 @@
-import { withSupportPortalApi } from "../../../lib/admin/access";
 import type { NextApiRequest, NextApiResponse } from "next";
 import { getStrapiBaseUrl } from "../../../services/fetchers";
 import {
+  clearPortalSessionCookie,
+  createPortalSessionCookie,
+  isClientCabinetUser,
   isProductClientUser,
-  setPortalSession,
 } from "../../../lib/portal/auth";
-import { requestStrapiRestAsService } from "../../../services/server/strapiClient";
+import {
+  requestStrapiRestAsService,
+  requestStrapiRestWithJwt,
+} from "../../../services/server/strapiClient";
 import type { Client } from "../../../types/strapi";
 import type { PortalUser } from "../../../types/portal";
 import {
@@ -19,6 +23,15 @@ import {
   loginAttemptKey,
   recordLoginFailure,
 } from "../../../lib/admin/http";
+import {
+  clearAdminSessionCookie,
+  createAdminSession,
+  createAdminSessionCookie,
+  isSupportUser,
+  type SupportUser,
+} from "../../../lib/admin/auth";
+import { clearSupportCabinetCookie } from "../../../lib/admin/impersonation";
+import { recordSupportAudit } from "../../../lib/admin/audit";
 
 const findPortalUser = async (identifier: string) => {
   const params = new URLSearchParams();
@@ -38,9 +51,13 @@ const findPortalUser = async (identifier: string) => {
 };
 
 async function handler(req: NextApiRequest, res: NextApiResponse) {
+  res.setHeader("Cache-Control", "private, no-store");
   if (req.method !== "POST") {
     res.setHeader("Allow", ["POST"]);
     return res.status(405).json({ error: "method_not_allowed" });
+  }
+  if (!isSameOriginRequest(req)) {
+    return res.status(403).json({ error: "invalid_origin" });
   }
 
   const identifier =
@@ -71,9 +88,6 @@ async function handler(req: NextApiRequest, res: NextApiResponse) {
   }
 
   if (verifySharedAdminPassword(password)) {
-    if (!isSameOriginRequest(req)) {
-      return res.status(403).json({ error: "invalid_origin" });
-    }
     try {
       const user = await findPortalUser(authIdentifier);
       if (
@@ -90,8 +104,17 @@ async function handler(req: NextApiRequest, res: NextApiResponse) {
         return res.status(401).json({ error: "invalid_credentials" });
       }
       clearLoginFailures(attemptKey);
-      setPortalSession(res, createSharedAdminPortalToken(user.id));
-      return res.status(200).json({ ok: true, sharedAdminAccess: true });
+      res.setHeader("Set-Cookie", [
+        createPortalSessionCookie(createSharedAdminPortalToken(user.id)),
+        clearAdminSessionCookie(),
+        clearSupportCabinetCookie(),
+      ]);
+      return res.status(200).json({
+        ok: true,
+        role: "client",
+        redirectTo: "/machines",
+        sharedAdminAccess: true,
+      });
     } catch (error) {
       console.error("[portal/login] shared admin access failed:", error);
       return res.status(503).json({ error: "portal_auth_unavailable" });
@@ -111,9 +134,48 @@ async function handler(req: NextApiRequest, res: NextApiResponse) {
     return res.status(401).json({ error: "invalid_credentials" });
   }
 
-  clearLoginFailures(attemptKey);
-  setPortalSession(res, payload.jwt);
-  return res.status(200).json({ ok: true });
+  try {
+    const user = await requestStrapiRestWithJwt<PortalUser & SupportUser>(
+      "/api/users/me?populate[0]=client&populate[1]=role",
+      payload.jwt,
+    );
+
+    if (isSupportUser(user)) {
+      clearLoginFailures(attemptKey);
+      const session = createAdminSession(user, payload.jwt);
+      await recordSupportAudit(session, { event: "login" });
+      res.setHeader("Set-Cookie", [
+        createAdminSessionCookie(session),
+        clearPortalSessionCookie(),
+        clearSupportCabinetCookie(),
+      ]);
+      return res.status(200).json({
+        ok: true,
+        role: "support",
+        redirectTo: "/admin",
+      });
+    }
+
+    if (!isClientCabinetUser(user) && !isProductClientUser(user)) {
+      recordLoginFailure(attemptKey);
+      return res.status(403).json({ error: "portal_access_required" });
+    }
+
+    clearLoginFailures(attemptKey);
+    res.setHeader("Set-Cookie", [
+      createPortalSessionCookie(payload.jwt),
+      clearAdminSessionCookie(),
+      clearSupportCabinetCookie(),
+    ]);
+    return res.status(200).json({
+      ok: true,
+      role: "client",
+      redirectTo: isProductClientUser(user) ? "/product-lines" : "/machines",
+    });
+  } catch (error) {
+    console.error("[portal/login] role resolution failed:", error);
+    return res.status(503).json({ error: "portal_auth_unavailable" });
+  }
 }
 
-export default withSupportPortalApi(handler);
+export default handler;

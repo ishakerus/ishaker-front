@@ -5,7 +5,7 @@ export const getServerSideProps: GetServerSideProps = async (context) => ({
   redirect: {
     destination: await resolveAdminSession(context.req.headers.cookie)
       ? "/admin/dashboard"
-      : "/admin/login",
+      : "/login",
     permanent: false,
   },
 });

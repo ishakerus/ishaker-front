@@ -45,7 +45,7 @@ export const resolveAdminSession = async (cookieHeader?: string): Promise<Suppor
 export const requireAdminSession = async (context: GetServerSidePropsContext) => {
   context.res.setHeader("Cache-Control", "private, no-store");
   if (await resolveAdminSession(context.req.headers.cookie)) return null;
-  return { redirect: { destination: "/admin/login", permanent: false as const } };
+  return { redirect: { destination: "/login", permanent: false as const } };
 };
 
 // API handlers run inside withAdminApi; the context cannot be supplied by a browser.

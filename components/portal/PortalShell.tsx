@@ -148,7 +148,7 @@ export function PortalShell({
                     textTransform="uppercase"
                     noOfLines={1}
                   >
-                    Admin Panel
+                    Client Panel
                   </Text>
                 </HStack>
 
