@@ -6,6 +6,7 @@ import { MachineField } from "./MachineField";
 import { MachineTypeIcon } from "./MachineTypeIcon";
 import { displayValue } from "./utils";
 import { ReadinessBadge } from "./ReadinessBadge";
+import { Box3D } from "../../styles/theme/custom";
 
 type MachineCardProps = {
   machine: Machine;
@@ -17,7 +18,13 @@ export function MachineCard({ machine, readinessNow }: MachineCardProps) {
   const patchVersion = getMachinePatchVersion(machine);
 
   return (
-    <Box border="1px solid" borderColor="whiteAlpha.100" borderRadius="8px" p={4} bg="bg.800">
+    <Box3D
+      border="1px solid"
+      borderColor="whiteAlpha.100"
+      borderRadius="8px"
+      p={4}
+      bg="bg.800"
+    >
       <Flex justify="space-between" gap={3} align="flex-start" mb={4}>
         <HStack minW={0} align="center">
           <Flex
@@ -47,20 +54,21 @@ export function MachineCard({ machine, readinessNow }: MachineCardProps) {
         <MachineField
           label="AnyDesk"
           value={machine.anydesk_id}
-          href={machine.anydesk_id ? `anydesk:${machine.anydesk_id}` : undefined}
+          href={
+            machine.anydesk_id ? `anydesk:${machine.anydesk_id}` : undefined
+          }
         />
         <MachineField label="Serial" value={machine.serial_number} />
         <MachineField label="Tailscale IP" value={machine.tailscale_ip} />
         <MachineField label="Patch version" value={patchVersion} />
-        <MachineField label="Machine type" value={machineType} icon={<MachineTypeIcon type={machineType} />} />
+        <MachineField
+          label="Machine type"
+          value={machineType}
+          icon={<MachineTypeIcon type={machineType} />}
+        />
       </SimpleGrid>
 
-      <Box
-        mt="4"
-        pt="4"
-        borderTop="1px solid"
-        borderColor="whiteAlpha.100"
-      >
+      <Box mt="4" pt="4" borderTop="1px solid" borderColor="whiteAlpha.100">
         <ReadinessBadge readiness={machine.readiness} now={readinessNow} />
         <Button
           as={Link}
@@ -73,6 +81,6 @@ export function MachineCard({ machine, readinessNow }: MachineCardProps) {
           Open readiness details
         </Button>
       </Box>
-    </Box>
+    </Box3D>
   );
 }

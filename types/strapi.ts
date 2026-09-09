@@ -16,6 +16,10 @@ export type MachineReadiness = {
 export type Patch = {
   id: string | number;
   slug?: string | null;
+  fix_summary?: string | null;
+  isStable?: boolean;
+  root_cause?: string | null;
+  deployed_at?: string | null;
 };
 
 export type Language = {

@@ -103,6 +103,19 @@ export const AdminClientsQuery = `
 
 export const AdminMachinesQuery = `
   query AdminMachines {
+    patches(
+      pagination: { pageSize: 2000 }
+      sort: ["id:DESC"]
+    ) {
+      data {
+        id
+        attributes {
+          slug
+          fix_summary
+          isStable
+        }
+      }
+    }
     machines(
       pagination: { pageSize: 2000 }
       sort: ["id:ASC"]
@@ -141,6 +154,24 @@ export const AdminMachinesQuery = `
               }
             }
           }
+        }
+      }
+    }
+  }
+`;
+
+export const AdminPatchesQuery = `
+  query AdminPatches {
+    patches(
+      pagination: { pageSize: 2000 }
+      sort: ["id:DESC"]
+    ) {
+      data {
+        id
+        attributes {
+          slug
+          fix_summary
+          isStable
         }
       }
     }
