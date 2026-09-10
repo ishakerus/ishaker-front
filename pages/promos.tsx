@@ -248,7 +248,7 @@ export default function PromosPage({
           border="1px solid"
           borderColor="whiteAlpha.100"
           borderRadius="2xl"
-          p="6"
+          p={{ base: "4", md: "6" }}
         >
           <VStack spacing="4" align="stretch">
             <Text color="acid.300" fontWeight="800">
@@ -262,50 +262,70 @@ export default function PromosPage({
                 align="stretch"
                 maxH="1000px"
                 overflowY="auto"
-                pr="2"
+                pr={{ base: "0", md: "2" }}
               >
                 {promos.map((promo) => (
-                  <Box3D variant="no_contrast" p="4" key={promo.id}>
-                    <Grid gridTemplateColumns="1fr auto" key={promo.id}>
-                      <Box>
-                        <HStack>
-                          <HStack spacing="3" align="center">
-                            <Text color="bg.50" fontWeight="800" fontSize="2xl">
-                              {promo.title || "Untitled promo"}
+                  <Box3D
+                    variant="no_contrast"
+                    p={{ base: "3", sm: "4" }}
+                    minW="0"
+                    key={promo.id}
+                  >
+                    <Grid
+                      gridTemplateColumns={{
+                        base: "minmax(0, 1fr)",
+                        sm: "minmax(0, 1fr) auto",
+                      }}
+                      gap={{ base: "3", sm: "4" }}
+                      alignItems="start"
+                    >
+                      <Box minW="0">
+                        <HStack
+                          spacing="2"
+                          align="flex-start"
+                          flexWrap="wrap"
+                        >
+                          <Text
+                            color="bg.50"
+                            fontWeight="800"
+                            fontSize={{ base: "lg", sm: "2xl" }}
+                            lineHeight="short"
+                            overflowWrap="anywhere"
+                          >
+                            {promo.title || "Untitled promo"}
+                          </Text>
+                          {promo.status === "cancelled" ? (
+                            <Text
+                              color="red.300"
+                              fontSize="md"
+                              fontWeight="700"
+                            >
+                              Revoked
                             </Text>
-                            {promo.status === "cancelled" ? (
-                              <Text
-                                color="red.300"
-                                fontSize="md"
-                                fontWeight="700"
-                              >
-                                Revoked
-                              </Text>
-                            ) : promo.status === "expired" ||
-                              isPromoExpired(promo.end_at, currentTime) ? (
-                              <Text
-                                color="orange.300"
-                                fontSize="md"
-                                fontWeight="700"
-                              >
-                                Expired
-                              </Text>
-                            ) : (
-                              <IconButton
-                                size="xs"
-                                aria-label="Revoke promo code"
-                                minH="8"
-                                minW="8"
-                                colorScheme="red"
-                                variant="outline"
-                                isLoading={revokingId === String(promo.id)}
-                                isDisabled={Boolean(revokingId)}
-                                onClick={() => void revokePromo(promo)}
-                              >
-                                <FiTrash2 size="1.2rem" />
-                              </IconButton>
-                            )}
-                          </HStack>
+                          ) : promo.status === "expired" ||
+                            isPromoExpired(promo.end_at, currentTime) ? (
+                            <Text
+                              color="orange.300"
+                              fontSize="md"
+                              fontWeight="700"
+                            >
+                              Expired
+                            </Text>
+                          ) : (
+                            <IconButton
+                              size="xs"
+                              aria-label="Revoke promo code"
+                              minH="8"
+                              minW="8"
+                              colorScheme="red"
+                              variant="outline"
+                              isLoading={revokingId === String(promo.id)}
+                              isDisabled={Boolean(revokingId)}
+                              onClick={() => void revokePromo(promo)}
+                            >
+                              <FiTrash2 size="1.2rem" />
+                            </IconButton>
+                          )}
                         </HStack>
                         <Text color="bg.200" fontWeight="700">
                           {promo.status === "cancelled"
@@ -316,7 +336,7 @@ export default function PromosPage({
                                 currentTime,
                               ) || ""}
                         </Text>
-                      <Text color="bg.300">
+                        <Text color="bg.300">
                           {promo.discount_type === "PERCENT"
                             ? `${promo.amount}% off • ${promo.used_count ?? 0} of ${promo.qty ?? "\u221e"} used`
                             : `${formatMoney(
@@ -325,16 +345,19 @@ export default function PromosPage({
                                   session.client.currency ||
                                   session.machines[0]?.currency,
                             )} off • ${promo.used_count ?? 0} of ${promo.qty ?? "\u221e"} used`}
-                      </Text>
-                      <Text color="bg.400" fontSize="sm">
-                        {promo.machine
-                          ? promo.machine.title ||
-                            promo.machine.serial_number ||
-                            `Machine #${promo.machine.id}`
-                          : "All machines"}
-                      </Text>
+                        </Text>
+                        <Text color="bg.400" fontSize="sm">
+                          {promo.machine
+                            ? promo.machine.title ||
+                              promo.machine.serial_number ||
+                              `Machine #${promo.machine.id}`
+                            : "All machines"}
+                        </Text>
                       </Box>
-                      <Box minW="100px">
+                      <Box
+                        minW={{ base: "0", sm: "100px" }}
+                        w={{ base: "full", sm: "auto" }}
+                      >
                         <Box3D
                           mb="2"
                           variant={
@@ -354,6 +377,7 @@ export default function PromosPage({
                             fontWeight="bold"
                             align="center"
                             fontSize="lg"
+                            overflowWrap="anywhere"
                           >
                             {promo.code}
                           </Text>
@@ -361,7 +385,12 @@ export default function PromosPage({
                       </Box>
                     </Grid>
 
-                    <Text color="bg.400" fontSize="xs">
+                    <Text
+                      color="bg.400"
+                      fontSize="xs"
+                      lineHeight="short"
+                      overflowWrap="anywhere"
+                    >
                       {formatPromoDate(promo.start_at, useLocalDates)} to{" "}
                       {formatPromoDate(promo.end_at, useLocalDates)}
                     </Text>
@@ -390,7 +419,7 @@ export default function PromosPage({
           border="1px solid"
           borderColor="whiteAlpha.100"
           borderRadius="2xl"
-          p="6"
+          p={{ base: "4", md: "6" }}
         >
           <VStack spacing="4" align="stretch">
             <Text color="acid.300" fontWeight="800">

@@ -146,8 +146,7 @@ export function Header({ borderColor = "whiteAlpha.100" }: HeaderProps) {
               <Button
                 as={Link}
                 href="/login"
-                variant="ghost"
-                color="white"
+                variant="primary"
                 size="sm"
                 leftIcon={<FiLogIn />}
               >
@@ -156,7 +155,7 @@ export function Header({ borderColor = "whiteAlpha.100" }: HeaderProps) {
               <Button
                 as={Link}
                 href="/get-started"
-                variant="primary"
+                variant="contrast"
                 size="sm"
                 leftIcon={<FiUserPlus />}
               >
@@ -253,7 +252,7 @@ export function Header({ borderColor = "whiteAlpha.100" }: HeaderProps) {
               <Button
                 as={Link}
                 href="/get-started"
-                variant="primary"
+                variant="contrast"
                 w="full"
                 leftIcon={<FiUserPlus />}
               >
@@ -262,7 +261,7 @@ export function Header({ borderColor = "whiteAlpha.100" }: HeaderProps) {
               <Button
                 as={Link}
                 href="/login"
-                variant="contrast"
+                variant="primary"
                 w="full"
                 leftIcon={<FiLogIn />}
               >

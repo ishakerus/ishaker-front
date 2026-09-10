@@ -419,6 +419,7 @@ export function MachineHealthStrip({
       </SimpleGrid>
       <MachineHealthDialog
         kind={dialog}
+        onlineStatus={health?.online}
         machine={{
           ...machine,
           water_type: health?.waterType ?? machine.water_type,

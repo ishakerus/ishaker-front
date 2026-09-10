@@ -6,13 +6,14 @@ import {
   ModalHeader,
   ModalOverlay,
 } from "@chakra-ui/react";
+import type { MachineHealthIndicator } from "../../../types/machineHealth";
 import type { Machine } from "../../../types/strapi";
-import { RemoteAccessContent } from "../machines/RemoteAccessDialog";
 import { CupsDialogContent } from "./CupsDialogContent";
 import { DoorLockDialogContent } from "./DoorLockDialogContent";
 import { NayaxDialogContent } from "./NayaxDialogContent";
 import { PowdersDialogContent } from "./PowdersDialogContent";
 import { WaterDialogContent } from "./WaterDialogContent";
+import { WifiDialogContent } from "./WifiDialogContent";
 
 export type HealthDialogKind =
   | "wifi"
@@ -34,11 +35,13 @@ const titles: Record<HealthDialogKind, string> = {
 export function MachineHealthDialog({
   kind,
   machine,
+  onlineStatus,
   onClose,
   onSaved,
 }: {
   kind: HealthDialogKind | null;
   machine: Machine;
+  onlineStatus?: MachineHealthIndicator;
   onClose: () => void;
   onSaved: () => void;
 }) {
@@ -56,7 +59,9 @@ export function MachineHealthDialog({
         </ModalHeader>
         <ModalCloseButton />
         <ModalBody pb="6">
-          {kind === "wifi" ? <RemoteAccessContent machine={machine} /> : null}
+          {kind === "wifi" ? (
+            <WifiDialogContent machine={machine} indicator={onlineStatus} />
+          ) : null}
           {kind === "nayax" ? <NayaxDialogContent /> : null}
           {kind === "water" ? (
             <WaterDialogContent machine={machine} onSaved={onSaved} />

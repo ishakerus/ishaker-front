@@ -133,12 +133,13 @@ const ownHealth = (machine: Machine, now: number): MachineHealthRow | null => {
   const uptimeSeconds =
     typeof health.app?.uptime_s === "number" ? health.app.uptime_s : null;
   const starting =
-    appState === "starting" ||
-    // Readings written before app.state existed: infer it from the uptime.
-    (appState === null &&
-      health.app?.frames_ok === false &&
-      uptimeSeconds !== null &&
-      uptimeSeconds <= STARTUP_GRACE_S);
+    health.app?.frames_ok !== true &&
+    (appState === "starting" ||
+      // Readings written before app.state existed: infer it from the uptime.
+      (appState === null &&
+        health.app?.frames_ok === false &&
+        uptimeSeconds !== null &&
+        uptimeSeconds <= STARTUP_GRACE_S));
   const online: MachineHealthIndicator = stale
     ? { state: "unknown", label: "Stale", source: "own", at: health.at }
     : starting
@@ -372,16 +373,21 @@ export const buildMachineHealthRow = (
   const fleetAt = typeof fleet?.at === "string" ? fleet.at : null;
   const fleetFresh = Boolean(fleetAt && !isStale(fleetAt, now));
   const fleetHealthy = fleet?.sweep === "ok" && fleet?.ssh_ok === true;
-  const currentOnline: MachineHealthIndicator = fleetAt
-    ? fleetFresh
-      ? {
-          state: fleetHealthy ? "ok" : "error",
-          label: fleetHealthy ? "Online" : "Offline",
-          source: "ops",
-          at: fleetAt,
-        }
-      : { state: "unknown", label: "Stale", source: "ops", at: fleetAt }
-    : fallback.online;
+  // An SSH sweep only tells us whether FleetPulse can open a remote shell. A failed
+  // sweep must not call the whole machine Offline when the cabinet is actively connected
+  // to telemetry. Conversely, a successful SSH sweep is strong positive evidence even if
+  // the third-party status has not caught up yet.
+  const currentOnline: MachineHealthIndicator = fleetFresh && fleetHealthy
+    ? { state: "ok", label: "Online", source: "ops", at: fleetAt }
+    : fallback.online.state === "ok"
+      ? fallback.online
+      : fleetAt
+        ? fleetFresh
+          ? { state: "error", label: "Offline", source: "ops", at: fleetAt }
+          : fallback.online.state !== "unknown"
+            ? fallback.online
+            : { state: "unknown", label: "Stale", source: "ops", at: fleetAt }
+        : fallback.online;
   const online: MachineHealthIndicator = {
     ...currentOnline,
     // `at` is the time of the latest status report. When that report says Offline,
@@ -396,18 +402,20 @@ export const buildMachineHealthRow = (
     // Levels stay on the own reading even once it ages — "this is what we last saw" is
     // still the most accurate thing anyone has, and the row labels it Stale. The online
     // badge is the exception: a stale reading must not go on claiming the machine is up,
-    // so it is handed back to whichever source is still reporting. While the reading is
-    // fresh the own badge wins outright, because it is the stronger evidence — we were
-    // inside the machine seconds ago, not asking a third party about it.
+    // so it is handed back to whichever source is still reporting. A fresh own reading
+    // normally wins because it comes from inside the machine; the exception is the brief
+    // Starting state, which should not override a concurrent positive connection report.
     const ownFresh = !isStale(machine.health?.at, now);
     const ownOnline = ownFresh
-      ? {
-          ...own.online,
-          lastOnlineAt:
-            own.online.state === "ok" && own.online.at
-              ? own.online.at
-              : machine.last_seen_at || null,
-        }
+      ? own.online.state === "warning" && online.state === "ok"
+        ? online
+        : {
+            ...own.online,
+            lastOnlineAt:
+              own.online.state === "ok" && own.online.at
+                ? own.online.at
+                : machine.last_seen_at || null,
+          }
       : online;
     const water = waterType === "mains"
       ? { state: "ok" as const, label: "∞ Mains", source: "ops" as const }
