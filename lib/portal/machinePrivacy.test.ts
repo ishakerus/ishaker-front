@@ -29,6 +29,7 @@ test("portal machine queries never request the nickname field", () => {
   assert.equal(requestedFields.includes("nickname"), false);
   assert.equal(requestedFields.includes("title"), true);
   assert.equal(requestedFields.includes("serial_number"), true);
+  assert.equal(requestedFields.includes("wrap_productline"), true);
 });
 
 test("portal machine payloads discard a nickname returned by an older API", () => {

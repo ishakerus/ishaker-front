@@ -1,29 +1,27 @@
 import {
   Alert,
   AlertIcon,
-  Badge,
   Box,
-  Button,
   FormControl,
   FormErrorMessage,
   FormHelperText,
-  FormLabel,
-  HStack,
+  IconButton,
   Input,
   InputGroup,
   InputRightAddon,
   Skeleton,
-  Spacer,
-  Switch,
+  Stack,
   Text,
   VStack,
 } from "@chakra-ui/react";
 import { useCallback, useEffect, useMemo, useState } from "react";
+import { FiSave } from "react-icons/fi";
 import {
   type FreeModeState,
   type FreeModeWriteResponse,
   parseFreeModeMinutes,
 } from "../../lib/freeMode";
+import { MachineSettingToggleHeader } from "./MachineSettingToggleHeader";
 
 type FreeModeResponse = {
   id: string | number;
@@ -195,22 +193,16 @@ export function MachineFreeMode({
       p={{ base: "5", md: "6" }}
     >
       <VStack align="stretch" spacing="4">
-        <HStack spacing="3">
-          <Box>
-            <Text color="acid.300" fontWeight="800" fontSize="lg">
-              Free mode
-            </Text>
-            <Text color="bg.300" fontSize="sm">
-              Temporarily make every drink free on this machine.
-            </Text>
-          </Box>
-          <Spacer />
-          {state ? (
-            <Badge colorScheme={currentlyEnabled ? "green" : "gray"}>
-              {currentlyEnabled ? "On" : "Off"}
-            </Badge>
-          ) : null}
-        </HStack>
+        <MachineSettingToggleHeader
+          title="Free mode"
+          switchLabel="Enable free mode"
+          isChecked={enabled}
+          isDisabled={isSaving || !state}
+          onChange={setEnabled}
+        />
+        <Text color="bg.300" fontSize="sm">
+          Temporarily make every drink free on this machine.
+        </Text>
 
         {isLoading && !state ? (
           <VStack align="stretch" spacing="3">
@@ -219,8 +211,12 @@ export function MachineFreeMode({
           </VStack>
         ) : (
           <>
-            <FormControl isInvalid={minutesInvalid} maxW="280px">
-              <HStack>
+            <Stack
+              direction={{ base: "column", sm: "row" }}
+              align={{ base: "stretch", sm: "flex-start" }}
+              spacing="3"
+            >
+              <FormControl isInvalid={minutesInvalid} maxW="280px">
                 <InputGroup>
                   <Input
                     type="number"
@@ -232,27 +228,28 @@ export function MachineFreeMode({
                     isDisabled={isSaving || !state}
                     onChange={(event) => setMinutes(event.target.value)}
                   />
-                  <InputRightAddon>MIN</InputRightAddon>
+                  <InputRightAddon>Minutes</InputRightAddon>
                 </InputGroup>
 
-                <Switch
-                  colorScheme="green"
-                  size="lg"
-                  isChecked={enabled}
-                  isDisabled={isSaving || !state}
-                  onChange={(event) => setEnabled(event.target.checked)}
-                  aria-label="Enable free mode"
-                />
-              </HStack>
+                {minutesInvalid ? (
+                  <FormErrorMessage>
+                    Enter a whole number from 0 to 3,600.
+                  </FormErrorMessage>
+                ) : (
+                  <FormHelperText color="bg.400">0 = forever</FormHelperText>
+                )}
+              </FormControl>
 
-              {minutesInvalid ? (
-                <FormErrorMessage>
-                  Enter a whole number from 0 to 3,600.
-                </FormErrorMessage>
-              ) : (
-                <FormHelperText color="bg.400">0 = forever</FormHelperText>
-              )}
-            </FormControl>
+              <IconButton
+                aria-label="Save free mode"
+                icon={<FiSave />}
+                variant="primary"
+                isLoading={isSaving}
+                isDisabled={!state || minutesInvalid || !isDirty}
+                onClick={() => void save()}
+                alignSelf={{ base: "flex-start", sm: "auto" }}
+              />
+            </Stack>
 
             {state ? (
               <VStack align="stretch" spacing="1">
@@ -263,25 +260,8 @@ export function MachineFreeMode({
                       : `Ends in ${countdownLabel(remainingSeconds || 0)}`}
                   </Text>
                 ) : null}
-                {state.source ? (
-                  <Text color="bg.400" fontSize="sm">
-                    {state.source === "machine"
-                      ? "Set from the kiosk"
-                      : "Set from the portal"}
-                  </Text>
-                ) : null}
               </VStack>
             ) : null}
-
-            <Button
-              variant="primary"
-              alignSelf="start"
-              isLoading={isSaving}
-              isDisabled={!state || minutesInvalid || !isDirty}
-              onClick={() => void save()}
-            >
-              Save free mode
-            </Button>
           </>
         )}
 

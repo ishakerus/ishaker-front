@@ -28,6 +28,7 @@ const PORTAL_MACHINE_FIELDS = [
   "readiness",
   "health",
   "has_door_lock",
+  "wrap_productline",
 ] as const;
 
 const PORTAL_MACHINE_INVENTORY_FIELDS = [

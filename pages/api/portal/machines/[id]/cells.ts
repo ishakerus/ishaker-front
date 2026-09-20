@@ -12,6 +12,7 @@ import {
   updateMachineCell,
 } from "../../../../../services/server/machineCells";
 import {
+  clampContainerAmountKg,
   getMachineContainerCount,
   isValidContainerSlot,
 } from "../../../../../lib/portal/containerSlots";
@@ -123,7 +124,6 @@ async function handler(req: NextApiRequest, res: NextApiResponse) {
           "This machine model has no powder container count configured.",
       });
     }
-    const maxAmountKg = containerCount === 8 ? 2 : 1;
     if (
       ["POST", "PUT"].includes(req.method || "") &&
       cells.some((cell) => cell.amount_kg === undefined)
@@ -137,23 +137,24 @@ async function handler(req: NextApiRequest, res: NextApiResponse) {
 
     if (req.method === "POST") {
       const assignments = parseAssignments([req.body]);
-      const assignment = assignments?.[0];
-      if (!assignment) {
+      const parsedAssignment = assignments?.[0];
+      if (!parsedAssignment) {
         return res.status(400).json({
           error: "invalid_machine_cell",
           message: "Enter a valid position, category, product, and active state.",
         });
       }
+      const assignment = {
+        ...parsedAssignment,
+        amountKg: clampContainerAmountKg(
+          parsedAssignment.amountKg,
+          containerCount,
+        ),
+      };
       if (assignment.position > containerCount) {
         return res.status(400).json({
           error: "invalid_container_slot",
           message: `Choose a physical container slot from 1 to ${containerCount}.`,
-        });
-      }
-      if (assignment.amountKg > maxAmountKg) {
-        return res.status(400).json({
-          error: "invalid_powder_amount",
-          message: `Powder amount must be between 0 and ${maxAmountKg} kg.`,
         });
       }
       if (cells.length >= containerCount) {
@@ -208,23 +209,28 @@ async function handler(req: NextApiRequest, res: NextApiResponse) {
       return res.status(201).json(await getMachineCells(machineId));
     }
 
-    const assignments = parseAssignments(req.body?.assignments);
-    if (!assignments) {
+    const parsedAssignments = parseAssignments(req.body?.assignments);
+    if (!parsedAssignments) {
       return res.status(400).json({
         error: "invalid_assignments",
         message: "Assignments must contain valid, unique container positions.",
       });
     }
+    const assignments = parsedAssignments.map((assignment) => ({
+      ...assignment,
+      amountKg: clampContainerAmountKg(
+        assignment.amountKg,
+        containerCount,
+      ),
+    }));
     if (
       assignments.some(
-        (assignment) =>
-          assignment.position > containerCount ||
-          assignment.amountKg > maxAmountKg,
+        (assignment) => assignment.position > containerCount,
       )
     ) {
       return res.status(400).json({
         error: "invalid_container_assignment",
-        message: `Every container must use slots 1 through ${containerCount} and an amount from 0 to ${maxAmountKg} kg.`,
+        message: `Every container must use slots 1 through ${containerCount}.`,
       });
     }
 

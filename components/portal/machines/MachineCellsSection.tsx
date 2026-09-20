@@ -6,6 +6,7 @@ import {
   Button,
   FormControl,
   FormErrorMessage,
+  Grid,
   HStack,
   IconButton,
   Image,
@@ -24,10 +25,12 @@ import {
 } from "@chakra-ui/react";
 import Link from "next/link";
 import { useMemo, useState } from "react";
-import { FiCheck, FiChevronDown, FiPlus } from "react-icons/fi";
+import { FiCheck, FiChevronDown, FiPlus, FiSave } from "react-icons/fi";
 import { GiPowder } from "react-icons/gi";
 import { IoWaterSharp } from "react-icons/io5";
 import {
+  clampContainerAmountKg,
+  getContainerMaxAmountKg,
   getDuplicateContainerSlots,
   isValidContainerSlot,
 } from "../../../lib/portal/containerSlots";
@@ -41,6 +44,7 @@ import type {
   PortalMachineCell,
 } from "../../../types/portal";
 import { ContainersPreview } from "../product-lines/ContainersPreview";
+import { CONTAINER_WIDTH } from "../product-lines/PowderContainer";
 
 type MachineCellsSectionProps = {
   machineId: string | number;
@@ -99,7 +103,18 @@ const buildDrafts = (
   initialCells: PortalMachineCell[],
   containerCount: number | null,
 ) => {
-  const existing = initialCells.map(hydrateCell);
+  const existing = initialCells.map((cell) => {
+    const hydrated = hydrateCell(cell);
+    return containerCount
+      ? {
+          ...hydrated,
+          amount_kg: clampContainerAmountKg(
+            hydrated.amount_kg,
+            containerCount,
+          ),
+        }
+      : hydrated;
+  });
   if (!containerCount) return existing;
 
   return Array.from({ length: containerCount }, (_, index) => {
@@ -179,7 +194,9 @@ export function MachineCellsSection({
   const emptyAssignedContainers = cells.filter(
     (cell) => cell.productId && (Number(cell.amount_kg) || 0) <= 0,
   );
-  const defaultAssignedAmountKg = (containerCount === 8 ? 2 : 1) * 0.7;
+  const defaultAssignedAmountKg = containerCount
+    ? getContainerMaxAmountKg(containerCount) * 0.7
+    : 0;
   const hasValidationError =
     containerCount === null ||
     invalidLegacyCells.length > 0 ||
@@ -711,6 +728,26 @@ export function MachineCellsSection({
     price: cell.price,
     amount_kg: cell.amount_kg,
   }));
+  const containersPreview = containerCount !== null ? (
+    <ContainersPreview
+      containerCount={containerCount}
+      cells={previewCells}
+      onAmountChange={(position, amountKg) => {
+        const cell = primaryCells.find(
+          (candidate) => candidate.position === position,
+        );
+        if (cell) updateCell(cell, { amount_kg: amountKg });
+      }}
+    />
+  ) : null;
+  const assignmentCards = (
+    <SimpleGrid
+      columns={{ base: 1, xl: containerCount === 4 ? 1 : 3 }}
+      spacing="4"
+    >
+      {primaryCells.map((cell) => renderSlot(cell))}
+    </SimpleGrid>
+  );
 
   return (
     <Box
@@ -722,14 +759,25 @@ export function MachineCellsSection({
       gridColumn={{ xl: "1 / -1" }}
     >
       <VStack spacing="4" align="stretch">
-        <Box>
-          <Text color="acid.300" fontWeight="800" fontSize="lg">
-            Container assignment
-          </Text>
-          <Text color="bg.300" mt="1" fontSize="sm">
-            Click and hold a container powder level to edit it.
-          </Text>
-        </Box>
+        <HStack justify="space-between" align="flex-start" spacing="4">
+          <Box>
+            <Text color="acid.300" fontWeight="800" fontSize="lg">
+              Container assignment
+            </Text>
+            <Text color="bg.300" mt="1" fontSize="sm">
+              Click and hold a container powder level to edit it.
+            </Text>
+          </Box>
+          <IconButton
+            aria-label="Save container assignment"
+            icon={<FiSave />}
+            variant="primary"
+            isLoading={isSaving}
+            isDisabled={hasValidationError}
+            onClick={() => void save()}
+            flexShrink={0}
+          />
+        </HStack>
         {loadError ? (
           <Alert status="error">
             <AlertIcon />
@@ -830,21 +878,31 @@ export function MachineCellsSection({
             </VStack>
           </Alert>
         ) : null}
-        {containerCount !== null ? (
-          <ContainersPreview
-            containerCount={containerCount}
-            cells={previewCells}
-            onAmountChange={(position, amountKg) => {
-              const cell = primaryCells.find(
-                (candidate) => candidate.position === position,
-              );
-              if (cell) updateCell(cell, { amount_kg: amountKg });
+        {containerCount === 4 ? (
+          <Grid
+            templateColumns={{
+              base: "minmax(0, 1fr)",
+              xl: "minmax(0, 1fr) minmax(360px, 440px)",
             }}
-          />
-        ) : null}
-        <SimpleGrid columns={{ base: 1, xl: 3 }} spacing="4">
-          {primaryCells.map((cell) => renderSlot(cell))}
-        </SimpleGrid>
+            gap="6"
+            alignItems="start"
+          >
+            <Box
+              w="full"
+              minW="0"
+              maxW={{ xl: `${CONTAINER_WIDTH * 4 + 48}px` }}
+              mx="auto"
+            >
+              {containersPreview}
+            </Box>
+            {assignmentCards}
+          </Grid>
+        ) : (
+          <>
+            {containersPreview}
+            {assignmentCards}
+          </>
+        )}
         {invalidLegacyCells.length ? (
           <Box>
             <Text fontWeight="800" color="red.200" mb="3">
@@ -855,16 +913,6 @@ export function MachineCellsSection({
             </SimpleGrid>
           </Box>
         ) : null}
-        <Button
-          onClick={() => void save()}
-          variant="primary"
-          size="lg"
-          alignSelf="end"
-          isLoading={isSaving}
-          isDisabled={hasValidationError}
-        >
-          Save container assignment
-        </Button>
       </VStack>
     </Box>
   );

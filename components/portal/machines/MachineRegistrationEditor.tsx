@@ -2,9 +2,10 @@ import {
   Alert,
   AlertIcon,
   Box,
-  Button,
   FormControl,
   FormLabel,
+  HStack,
+  IconButton,
   Input,
   SimpleGrid,
   Text,
@@ -13,6 +14,7 @@ import {
 } from "@chakra-ui/react";
 import { useRouter } from "next/router";
 import { FormEvent, useState } from "react";
+import { FiSave } from "react-icons/fi";
 import type { Machine } from "../../../types/strapi";
 
 type MachineRegistrationEditorProps = {
@@ -77,9 +79,19 @@ export function MachineRegistrationEditor({
       p="6"
     >
       <VStack spacing="4" align="stretch">
-        <Box color="acid.300" fontWeight="800">
-          Machine settings
-        </Box>
+        <HStack justify="space-between" align="center">
+          <Box color="acid.300" fontWeight="800">
+            Machine settings
+          </Box>
+          <IconButton
+            type="submit"
+            aria-label="Save machine settings"
+            icon={<FiSave />}
+            variant="primary"
+            isLoading={isSaving}
+            isDisabled={!country.trim()}
+          />
+        </HStack>
         <FormControl isRequired>
           <FormLabel>Country</FormLabel>
           <Input value={country} onChange={(event) => setCountry(event.target.value)} />
@@ -103,15 +115,6 @@ export function MachineRegistrationEditor({
         <Text color="bg.300" fontSize="sm">
           Applies to the kiosk within 5 minutes. No restart needed.
         </Text>
-        <Button
-          type="submit"
-          variant="primary"
-          alignSelf="flex-start"
-          isLoading={isSaving}
-          isDisabled={!country.trim()}
-        >
-          Save machine data
-        </Button>
       </VStack>
     </Box>
   );

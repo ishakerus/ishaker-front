@@ -57,6 +57,7 @@ export const updateMachineRegistrationData = async (params: {
   currencyId?: string | number;
   languageId?: string | number;
   nayaxTerminalId?: string;
+  wrapProductline?: boolean;
 }) => {
   const index = await getMachineOwnerIndex(params.client.id, params.machine.id);
   const title =
@@ -82,6 +83,9 @@ export const updateMachineRegistrationData = async (params: {
           ...(params.languageId ? { language: params.languageId } : {}),
           ...(typeof params.nayaxTerminalId === "string"
             ? { nayax_terminal_id: clean(params.nayaxTerminalId) || null }
+            : {}),
+          ...(typeof params.wrapProductline === "boolean"
+            ? { wrap_productline: params.wrapProductline }
             : {}),
         },
       }),

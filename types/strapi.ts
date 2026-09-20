@@ -53,6 +53,7 @@ export type Machine = {
   free_mode_started_at?: string | null;
   free_mode_rev?: number | string | null;
   free_mode_source?: "portal" | "machine" | null;
+  wrap_productline?: boolean | null;
   type?: "small" | "big";
   status?: "new" | "ready" | "shipped" | "working" | "error" | "offline";
   title?: string;

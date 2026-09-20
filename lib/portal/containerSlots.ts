@@ -28,6 +28,18 @@ export const getMachineContainerCount = (
   return null;
 };
 
+export const getContainerMaxAmountKg = (containerCount: number) =>
+  containerCount === 8 ? 5.5 : 1.5;
+
+export const clampContainerAmountKg = (
+  amountKg: unknown,
+  containerCount: number,
+) => {
+  const amount = Number(amountKg);
+  if (!Number.isFinite(amount) || amount <= 0) return 0;
+  return Math.min(amount, getContainerMaxAmountKg(containerCount));
+};
+
 export const getLowestFreeContainerSlot = (
   positions: number[],
   containerCount: number,

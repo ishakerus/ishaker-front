@@ -1,6 +1,7 @@
 import { Box, SimpleGrid, Text } from "@chakra-ui/react";
 import { useEffect, useMemo, useState } from "react";
 import { getSmallestMediaUrl } from "../../../lib/portal/media";
+import { getContainerMaxAmountKg } from "../../../lib/portal/containerSlots";
 import type { PortalMachineCell } from "../../../types/portal";
 import {
   CONTAINER_WIDTH,
@@ -26,7 +27,7 @@ export function ContainersPreview({
   cells,
   onAmountChange,
 }: ContainersPreviewProps) {
-  const maxWeightKg = containerCount === 8 ? 2 : 1;
+  const maxWeightKg = getContainerMaxAmountKg(containerCount);
   const cellsByPosition = useMemo(
     () => new Map(cells.map((cell) => [cell.position, cell])),
     [cells],

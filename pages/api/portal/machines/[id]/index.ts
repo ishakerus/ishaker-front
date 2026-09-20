@@ -51,18 +51,26 @@ async function handler(
   const currencyProvided = hasOwn(req.body, "currencyId");
   const languageProvided = hasOwn(req.body, "languageId");
   const nayaxProvided = hasOwn(req.body, "nayaxTerminalId");
+  const wrapProductlineProvided = hasOwn(req.body, "wrap_productline");
   if (
     !countryProvided &&
     !stateProvided &&
     !cityProvided &&
     !currencyProvided &&
     !languageProvided &&
-    !nayaxProvided
+    !nayaxProvided &&
+    !wrapProductlineProvided
   ) {
     return res.status(400).json({ error: "no_machine_updates" });
   }
   if (nayaxProvided && typeof req.body?.nayaxTerminalId !== "string") {
     return res.status(400).json({ error: "invalid_nayax_terminal_id" });
+  }
+  if (
+    wrapProductlineProvided &&
+    typeof req.body?.wrap_productline !== "boolean"
+  ) {
+    return res.status(400).json({ error: "invalid_wrap_productline" });
   }
   const country = countryProvided ? asString(req.body?.country) : machine.country || "";
   const stateRegion = stateProvided
@@ -136,6 +144,9 @@ async function handler(
           currencyId: currencyProvided ? currency?.id : undefined,
           languageId: language?.id,
           nayaxTerminalId,
+          wrapProductline: wrapProductlineProvided
+            ? req.body.wrap_productline
+            : undefined,
         })
       : await requestStrapiRestAsService(
           `/api/machines/${machine.id}?${responseParams.toString()}`,
@@ -147,6 +158,9 @@ async function handler(
                 ...(language ? { language: language.id } : {}),
                 ...(nayaxProvided
                   ? { nayax_terminal_id: nayaxTerminalId || null }
+                  : {}),
+                ...(wrapProductlineProvided
+                  ? { wrap_productline: req.body.wrap_productline }
                   : {}),
               },
             }),

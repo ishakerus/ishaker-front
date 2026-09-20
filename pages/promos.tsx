@@ -244,6 +244,7 @@ export default function PromosPage({
     >
       <SimpleGrid columns={{ base: 1, xl: 2 }} spacing="6">
         <Box
+          order={{ base: 2, xl: 1 }}
           bg="bg.900"
           border="1px solid"
           borderColor="whiteAlpha.100"
@@ -267,10 +268,55 @@ export default function PromosPage({
                 {promos.map((promo) => (
                   <Box3D
                     variant="no_contrast"
+                    bg={
+                      promo.status === "cancelled"
+                        ? "blackAlpha.200"
+                        : undefined
+                    }
                     p={{ base: "3", sm: "4" }}
                     minW="0"
                     key={promo.id}
                   >
+                    <Box
+                      position="absolute"
+                      top={{ base: "3", sm: "4" }}
+                      right={{ base: "3", sm: "4" }}
+                      zIndex="1"
+                    >
+                      {promo.status === "cancelled" ? (
+                        <Text
+                          color="red.300"
+                          fontSize="md"
+                          fontWeight="700"
+                        >
+                          Revoked
+                        </Text>
+                      ) : promo.status === "expired" ||
+                        isPromoExpired(promo.end_at, currentTime) ? (
+                        <Text
+                          color="orange.300"
+                          fontSize="md"
+                          fontWeight="700"
+                        >
+                          Expired
+                        </Text>
+                      ) : (
+                        <IconButton
+                          size="xs"
+                          aria-label="Revoke promo code"
+                          minH="8"
+                          minW="8"
+                          colorScheme="red"
+                          variant="outline"
+                          isLoading={revokingId === String(promo.id)}
+                          isDisabled={Boolean(revokingId)}
+                          onClick={() => void revokePromo(promo)}
+                        >
+                          <FiTrash2 size="1.2rem" />
+                        </IconButton>
+                      )}
+                    </Box>
+
                     <Grid
                       gridTemplateColumns={{
                         base: "minmax(0, 1fr)",
@@ -280,52 +326,17 @@ export default function PromosPage({
                       alignItems="start"
                     >
                       <Box minW="0">
-                        <HStack
-                          spacing="2"
-                          align="flex-start"
-                          flexWrap="wrap"
-                        >
+                        <HStack spacing="2" align="flex-start">
                           <Text
                             color="bg.50"
                             fontWeight="800"
                             fontSize={{ base: "lg", sm: "2xl" }}
                             lineHeight="short"
                             overflowWrap="anywhere"
+                            pr={{ base: "20", sm: "24" }}
                           >
                             {promo.title || "Untitled promo"}
                           </Text>
-                          {promo.status === "cancelled" ? (
-                            <Text
-                              color="red.300"
-                              fontSize="md"
-                              fontWeight="700"
-                            >
-                              Revoked
-                            </Text>
-                          ) : promo.status === "expired" ||
-                            isPromoExpired(promo.end_at, currentTime) ? (
-                            <Text
-                              color="orange.300"
-                              fontSize="md"
-                              fontWeight="700"
-                            >
-                              Expired
-                            </Text>
-                          ) : (
-                            <IconButton
-                              size="xs"
-                              aria-label="Revoke promo code"
-                              minH="8"
-                              minW="8"
-                              colorScheme="red"
-                              variant="outline"
-                              isLoading={revokingId === String(promo.id)}
-                              isDisabled={Boolean(revokingId)}
-                              onClick={() => void revokePromo(promo)}
-                            >
-                              <FiTrash2 size="1.2rem" />
-                            </IconButton>
-                          )}
                         </HStack>
                         <Text color="bg.200" fontWeight="700">
                           {promo.status === "cancelled"
@@ -413,6 +424,7 @@ export default function PromosPage({
         </Box>
 
         <Box
+          order={{ base: 1, xl: 2 }}
           as="form"
           onSubmit={onSubmit}
           bg="bg.900"
