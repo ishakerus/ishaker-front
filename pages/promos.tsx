@@ -296,45 +296,57 @@ export default function PromosPage({
                     minW="0"
                     key={promo.id}
                   >
-                    <Box
-                      position="absolute"
-                      top={{ base: "3", sm: "4" }}
-                      right={{ base: "3", sm: "4" }}
-                      zIndex="1"
+                    <HStack
+                      justify="space-between"
+                      align="flex-start"
+                      spacing="3"
+                      mb="3"
                     >
-                      {promo.status === "cancelled" ? (
-                        <Text
-                          color="red.300"
-                          fontSize="md"
-                          fontWeight="700"
-                        >
-                          Revoked
-                        </Text>
-                      ) : promo.status === "expired" ||
-                        isPromoExpired(promo.end_at, currentTime) ? (
-                        <Text
-                          color="orange.300"
-                          fontSize="md"
-                          fontWeight="700"
-                        >
-                          Expired
-                        </Text>
-                      ) : (
-                        <IconButton
-                          size="xs"
-                          aria-label="Revoke promo code"
-                          minH="8"
-                          minW="8"
-                          colorScheme="red"
-                          variant="outline"
-                          isLoading={revokingId === String(promo.id)}
-                          isDisabled={Boolean(revokingId)}
-                          onClick={() => void revokePromo(promo)}
-                        >
-                          <FiTrash2 size="1.2rem" />
-                        </IconButton>
-                      )}
-                    </Box>
+                      <Text
+                        color="bg.50"
+                        fontWeight="800"
+                        fontSize={{ base: "lg", sm: "2xl" }}
+                        lineHeight="short"
+                        overflowWrap="anywhere"
+                        minW="0"
+                      >
+                        {promo.title || "Untitled promo"}
+                      </Text>
+                      <Box flexShrink="0">
+                        {promo.status === "cancelled" ? (
+                          <Text
+                            color="red.300"
+                            fontSize="md"
+                            fontWeight="700"
+                          >
+                            Revoked
+                          </Text>
+                        ) : promo.status === "expired" ||
+                          isPromoExpired(promo.end_at, currentTime) ? (
+                          <Text
+                            color="orange.300"
+                            fontSize="md"
+                            fontWeight="700"
+                          >
+                            Expired
+                          </Text>
+                        ) : (
+                          <IconButton
+                            size="xs"
+                            aria-label="Revoke promo code"
+                            minH="8"
+                            minW="8"
+                            colorScheme="red"
+                            variant="outline"
+                            isLoading={revokingId === String(promo.id)}
+                            isDisabled={Boolean(revokingId)}
+                            onClick={() => void revokePromo(promo)}
+                          >
+                            <FiTrash2 size="1.2rem" />
+                          </IconButton>
+                        )}
+                      </Box>
+                    </HStack>
 
                     <Grid
                       gridTemplateColumns={{
@@ -345,18 +357,6 @@ export default function PromosPage({
                       alignItems="start"
                     >
                       <Box minW="0">
-                        <HStack spacing="2" align="flex-start">
-                          <Text
-                            color="bg.50"
-                            fontWeight="800"
-                            fontSize={{ base: "lg", sm: "2xl" }}
-                            lineHeight="short"
-                            overflowWrap="anywhere"
-                            pr={{ base: "20", sm: "24" }}
-                          >
-                            {promo.title || "Untitled promo"}
-                          </Text>
-                        </HStack>
                         <Text color="bg.200" fontWeight="700">
                           {promo.status === "cancelled"
                             ? ""

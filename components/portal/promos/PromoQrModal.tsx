@@ -1,6 +1,7 @@
 import {
   Box,
   Button,
+  Grid,
   Link,
   Modal,
   ModalBody,
@@ -12,8 +13,6 @@ import {
   Text,
   useToast,
   VStack,
-  Wrap,
-  WrapItem,
 } from "@chakra-ui/react";
 import { useEffect, useRef, useState } from "react";
 import { FiCheck, FiCopy, FiDownload, FiShare2 } from "react-icons/fi";
@@ -279,33 +278,43 @@ export function PromoQrModal({
           </VStack>
         </ModalBody>
         <ModalFooter>
-          <Wrap width="100%" justify="flex-end" spacing="2">
-            <WrapItem>
-              <Button variant="ghost" onClick={onClose}>
-                Close
-              </Button>
-            </WrapItem>
-            <WrapItem>
+          <VStack width="100%" spacing="2">
+            <Grid
+              width="100%"
+              gridTemplateColumns={`repeat(${canShare ? 3 : 2}, minmax(0, 1fr))`}
+              gap="2"
+            >
               <Button
+                width="100%"
+                minW="0"
+                px="2"
+                iconSpacing="1.5"
+                fontSize={{ base: "xs", sm: "sm" }}
                 leftIcon={copied === "code" ? <FiCheck /> : <FiCopy />}
                 onClick={() => void copyText(normalizedCode, "code")}
                 variant="outline"
               >
                 {copied === "code" ? "Code copied" : "Copy code"}
               </Button>
-            </WrapItem>
-            <WrapItem>
               <Button
+                width="100%"
+                minW="0"
+                px="2"
+                iconSpacing="1.5"
+                fontSize={{ base: "xs", sm: "sm" }}
                 leftIcon={copied === "link" ? <FiCheck /> : <FiCopy />}
                 onClick={() => void copyText(url, "link")}
                 variant="outline"
               >
                 {copied === "link" ? "Link copied" : "Copy link"}
               </Button>
-            </WrapItem>
-            {canShare ? (
-              <WrapItem>
+              {canShare ? (
                 <Button
+                  width="100%"
+                  minW="0"
+                  px="2"
+                  iconSpacing="1.5"
+                  fontSize={{ base: "xs", sm: "sm" }}
                   leftIcon={<FiShare2 />}
                   onClick={() => void share()}
                   variant="outline"
@@ -317,20 +326,19 @@ export function PromoQrModal({
                     ? "Share image"
                     : "Share link"}
                 </Button>
-              </WrapItem>
-            ) : null}
-            <WrapItem>
-              <Button
-                leftIcon={<FiDownload />}
-                onClick={() => void download()}
-                isLoading={isDownloading}
-                loadingText="Creating PNG"
-                variant="primary"
-              >
-                Download PNG
-              </Button>
-            </WrapItem>
-          </Wrap>
+              ) : null}
+            </Grid>
+            <Button
+              width="100%"
+              leftIcon={<FiDownload />}
+              onClick={() => void download()}
+              isLoading={isDownloading}
+              loadingText="Creating PNG"
+              variant="primary"
+            >
+              Download PNG
+            </Button>
+          </VStack>
         </ModalFooter>
       </ModalContent>
     </Modal>
