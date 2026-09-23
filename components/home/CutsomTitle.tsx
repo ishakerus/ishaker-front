@@ -17,7 +17,7 @@ type CustomTitleProps = {
   subtitle2Props?: TextProps;
 } & BoxProps;
 
-export default function ({
+export default function CustomTitle({
   as,
   title,
   subtitle,

@@ -3,6 +3,8 @@ import {
   Button,
   ButtonGroup,
   FormControl,
+  FormErrorMessage,
+  FormHelperText,
   FormLabel,
   HStack,
   Input,
@@ -16,12 +18,15 @@ import {
   WrapItem,
   Grid,
   IconButton,
+  Tooltip,
 } from "@chakra-ui/react";
 import type { GetServerSideProps } from "next";
 import { useRouter } from "next/router";
 import { FormEvent, useEffect, useState } from "react";
 import { FiTrash2 } from "react-icons/fi";
+import { MdQrCode2 } from "react-icons/md";
 import { PortalShell } from "../components/portal/PortalShell";
+import { PromoQrModal } from "../components/portal/promos/PromoQrModal";
 import { requirePortalSession } from "../lib/portal/auth";
 import { requestStrapiRestAsService } from "../services/server/strapiClient";
 import type { PortalSession, PromoCode } from "../types/portal";
@@ -37,6 +42,12 @@ import {
   toDateTimeLocalValue,
 } from "../lib/portal/promoDates";
 import { Box3D } from "../styles/theme/custom";
+import { isQrSafePromoCode } from "../lib/portal/promoQr";
+
+const INVALID_QR_CODE_MESSAGE =
+  "Use only letters, digits, - or _, up to 32 characters.";
+const UNSAFE_QR_CODE_TOOLTIP =
+  "This code has characters the machine scanner can't read — create a new code with letters, digits, - or _.";
 
 const START_SHORTCUTS: Array<{ label: string; value: PromoStartShortcut }> = [
   { label: "now", value: "now" },
@@ -83,6 +94,7 @@ const formatPromoDate = (value: string, useLocalTime = false) => {
 };
 
 const getErrorMessage = (payload: any) => {
+  if (payload?.error === "invalid_code") return INVALID_QR_CODE_MESSAGE;
   if (typeof payload?.message === "string" && payload.message)
     return payload.message;
   if (typeof payload?.details === "string" && payload.details)
@@ -130,9 +142,11 @@ export default function PromosPage({
   const [revokeError, setRevokeError] = useState("");
   const [currentTime, setCurrentTime] = useState(serverNow);
   const [useLocalDates, setUseLocalDates] = useState(false);
+  const [qrPromo, setQrPromo] = useState<PromoCode | null>(null);
   const globalCurrency =
     session.client.currency || session.machines[0]?.currency || null;
   const currencySymbol = getCurrencySymbol(globalCurrency);
+  const codeHasError = code.length > 0 && !isQrSafePromoCode(code);
 
   useEffect(() => {
     setUseLocalDates(true);
@@ -194,6 +208,11 @@ export default function PromosPage({
   const onSubmit = async (event: FormEvent<HTMLFormElement>) => {
     event.preventDefault();
     setError("");
+
+    if (!isQrSafePromoCode(code)) {
+      setError(INVALID_QR_CODE_MESSAGE);
+      return;
+    }
 
     if (hasPromoCodeScopeConflict(promos, code, machineId || null)) {
       setError(
@@ -369,30 +388,63 @@ export default function PromosPage({
                         minW={{ base: "0", sm: "100px" }}
                         w={{ base: "full", sm: "auto" }}
                       >
-                        <Box3D
-                          mb="2"
-                          variant={
-                            promo.status === "cancelled" ||
-                            promo.status === "expired" ||
-                            isPromoExpired(promo.end_at, currentTime)
-                              ? "no_contrast"
-                              : "primary"
-                          }
-                          p="2"
-                          w="100%"
-                          boxShadow="lg"
-                          borderRadius="md"
-                        >
-                          <Text
-                            color="bg.900"
-                            fontWeight="bold"
-                            align="center"
-                            fontSize="lg"
-                            overflowWrap="anywhere"
+                        <HStack align="stretch" spacing="2" mb="2">
+                          <Box3D
+                            variant={
+                              promo.status === "cancelled" ||
+                              promo.status === "expired" ||
+                              isPromoExpired(promo.end_at, currentTime)
+                                ? "no_contrast"
+                                : "primary"
+                            }
+                            p="2"
+                            flex="1"
+                            minW="0"
+                            boxShadow="lg"
+                            borderRadius="md"
                           >
-                            {promo.code}
-                          </Text>
-                        </Box3D>
+                            <Text
+                              color="bg.900"
+                              fontWeight="bold"
+                              align="center"
+                              fontSize="lg"
+                              overflowWrap="anywhere"
+                            >
+                              {promo.code}
+                            </Text>
+                          </Box3D>
+                          <Tooltip
+                            label={
+                              !isQrSafePromoCode(promo.code)
+                                ? UNSAFE_QR_CODE_TOOLTIP
+                                : "QR codes are unavailable for expired or revoked promos."
+                            }
+                            hasArrow
+                            isDisabled={
+                              isQrSafePromoCode(promo.code) &&
+                              promo.status !== "cancelled" &&
+                              promo.status !== "expired" &&
+                              !isPromoExpired(promo.end_at, currentTime)
+                            }
+                          >
+                            <Box as="span">
+                              <IconButton
+                                aria-label={`Show QR code for ${promo.code}`}
+                                icon={<MdQrCode2 size="1.35rem" />}
+                                h="100%"
+                                minH="10"
+                                variant="outline"
+                                isDisabled={
+                                  !isQrSafePromoCode(promo.code) ||
+                                  promo.status === "cancelled" ||
+                                  promo.status === "expired" ||
+                                  isPromoExpired(promo.end_at, currentTime)
+                                }
+                                onClick={() => setQrPromo(promo)}
+                              />
+                            </Box>
+                          </Tooltip>
+                        </HStack>
                       </Box>
                     </Grid>
 
@@ -445,13 +497,17 @@ export default function PromosPage({
                 placeholder="Promo name. Ex: Sunday 50% OFF"
               />
             </FormControl>
-            <FormControl>
+            <FormControl isInvalid={codeHasError}>
               <FormLabel>Code</FormLabel>
               <Input
                 value={code}
                 onChange={(event) => setCode(event.target.value.toUpperCase())}
                 placeholder="Send this to your clients. Ex: SUNDAY50"
               />
+              <FormHelperText>
+                Use letters, digits, - and _, up to 32 characters.
+              </FormHelperText>
+              <FormErrorMessage>{INVALID_QR_CODE_MESSAGE}</FormErrorMessage>
             </FormControl>
             <FormControl>
               <FormLabel>Target machine</FormLabel>
@@ -605,13 +661,21 @@ export default function PromosPage({
               type="submit"
               variant="primary"
               isLoading={isSubmitting}
-              isDisabled={!code || !amount || !qty || !startAt || !endAt}
+              isDisabled={
+                !code || codeHasError || !amount || !qty || !startAt || !endAt
+              }
             >
               Create promo code
             </Button>
           </VStack>
         </Box>
       </SimpleGrid>
+      <PromoQrModal
+        promo={qrPromo}
+        isOpen={Boolean(qrPromo)}
+        onClose={() => setQrPromo(null)}
+        fallbackCurrency={globalCurrency}
+      />
     </PortalShell>
   );
 }

@@ -5,6 +5,7 @@ import {
   getPortalSessionFromApiRequest,
 } from "../../../../lib/portal/auth";
 import { hasPromoCodeScopeConflict } from "../../../../lib/portal/promoScope";
+import { isQrSafePromoCode } from "../../../../lib/portal/promoQr";
 import { requestStrapiRestAsService } from "../../../../services/server/strapiClient";
 import type { PromoCode } from "../../../../types/portal";
 
@@ -57,7 +58,11 @@ async function handler(req: NextApiRequest, res: NextApiResponse) {
     const qty = Number.isFinite(qtyRaw) && qtyRaw > 0 ? Math.trunc(qtyRaw) : null;
     const machineIdRaw = req.body?.machineId;
 
-    if (!code || !discountType || !Number.isFinite(amount) || !startAt || !endAt) {
+    if (!isQrSafePromoCode(code)) {
+      return res.status(400).json({ error: "invalid_code" });
+    }
+
+    if (!discountType || !Number.isFinite(amount) || !startAt || !endAt) {
       return res.status(400).json({ error: "missing_required_fields" });
     }
 
