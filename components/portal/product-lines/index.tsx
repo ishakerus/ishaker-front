@@ -43,6 +43,7 @@ import { MachineConsumptionSection } from "../machines/MachineConsumptionSection
 import { OrphanProductCard } from "./OrphanProductCard";
 import { ProductLineCard } from "./ProductLineCard";
 import { getProductLineIcon } from "./NewProductLinePage";
+import { SupportContactBox } from "../../shared/SupportContactBox";
 
 export type MachineContainerAssignment = {
   machine: Machine;
@@ -392,6 +393,12 @@ export function ProductLinesPage({
           </SimpleGrid>
         </Box>
       ) : null}
+
+      <SupportContactBox
+        hasKnownClient={
+          session.access === "client" && Boolean(session.client.id)
+        }
+      />
 
       <Modal
         isOpen={productLineChooser.isOpen}

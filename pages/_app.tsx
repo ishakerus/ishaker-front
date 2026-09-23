@@ -47,7 +47,12 @@ function MyApp({ Component, pageProps }: AppProps) {
           <RouteLoadingOverlay />
           <SupportSessionBanner session={pageProps.session} />
           <Component {...pageProps} />
-          <Footer />
+          <Footer
+            hasKnownClient={
+              pageProps.session?.access === "client" &&
+              Boolean(pageProps.session?.client?.id)
+            }
+          />
         </ChakraProvider>
       </Provider>
     </>

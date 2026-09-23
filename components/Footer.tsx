@@ -9,6 +9,7 @@ import {
 } from "@chakra-ui/react";
 import Image from "next/image";
 import Link from "next/link";
+import { TicketButton } from "./shared/TicketButton";
 
 const productLinks = [
   { href: "/shop", label: "iShaker Shop" },
@@ -34,7 +35,7 @@ const FooterLink = ({ href, label }: { href: string; label: string }) => (
   </ChakraLink>
 );
 
-export function Footer() {
+export function Footer({ hasKnownClient = false }: { hasKnownClient?: boolean }) {
   const currentYear = new Date().getFullYear();
 
   return (
@@ -97,6 +98,15 @@ export function Footer() {
               Setup guidance, machine monitoring, and everyday operational
               support.
             </Text>
+            <TicketButton
+              title="Contact us"
+              hasKnownClient={hasKnownClient}
+              variant="link"
+              color="whiteAlpha.700"
+              fontSize="sm"
+              minH="auto"
+              _hover={{ color: "white", textDecoration: "none" }}
+            />
           </VStack>
         </SimpleGrid>
 

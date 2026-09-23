@@ -7,6 +7,7 @@ import {
   VStack,
 } from "@chakra-ui/react";
 import { FaArrowRight } from "react-icons/fa";
+import { TicketButton } from "../shared/TicketButton";
 import CustomTitle from "./CutsomTitle";
 import { SmokeScene } from "./smoke";
 
@@ -74,9 +75,7 @@ export function HeroSection({ muted, headingColor }: HeroSectionProps) {
             >
               Get Started
             </Button>
-            <Button as="a" href="/login" variant="contrast">
-              Already registered
-            </Button>
+            <TicketButton title="Contact us" />
           </Flex>
         </VStack>
 

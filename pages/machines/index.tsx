@@ -24,6 +24,7 @@ import type { MachineHealthRow } from "../../types/machineHealth";
 import { FaPlus } from "react-icons/fa";
 import { Box3D } from "../../styles/theme/custom";
 import { ImInfo } from "react-icons/im";
+import { SupportContactBox } from "../../components/shared/SupportContactBox";
 type MachinesPageProps = {
   session: PortalSession;
   machines: PortalMachineSummary[];
@@ -273,6 +274,7 @@ export default function MachinesPage({ session, machines }: MachinesPageProps) {
           Register another machine
         </Button>
       </HStack>
+      <SupportContactBox hasKnownClient />
     </PortalShell>
   );
 }

@@ -1,5 +1,16 @@
 export type MachineReadinessVerdict = "SHIP" | "REVIEW" | "DO_NOT_SHIP";
 
+export type Ticket = {
+  id: string | number;
+  description?: string | null;
+  status?: "suggestion" | "question" | "bug" | null;
+  email?: string | null;
+  client?: Pick<Client, "id" | "company"> | null;
+  resolved: boolean | null;
+  createdAt?: string | null;
+  updatedAt?: string | null;
+};
+
 export type MachineReadiness = {
   at?: string | null;
   verdict: MachineReadinessVerdict;

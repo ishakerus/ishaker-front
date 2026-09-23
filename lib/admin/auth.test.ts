@@ -95,7 +95,7 @@ test('cabinet grants last up to two hours and are bound to the exact support log
 });
 
 test('support matches client portal mutations while retaining admin-only boundaries', () => {
-  for (const collection of ['machines','currencies','presets','languages','translations','translation-entries','translation-sets','voice-clips','products','product-lines','tutorials']) {
+  for (const collection of ['machines','currencies','presets','languages','translations','translation-entries','translation-sets','voice-clips','products','product-lines','tutorials','tickets']) {
     assert.ok(canSupportWriteStrapi(`/api/${collection}`, "POST"));
     assert.ok(canSupportWriteStrapi(`/api/${collection}/1`, "PUT"));
   }
@@ -117,6 +117,7 @@ test('support matches client portal mutations while retaining admin-only boundar
   assert.equal(canSupportUseRoute("/api/admin/machines/1/door-key", "POST", "admin"), false);
   assert.equal(canSupportUseRoute("/api/admin/product-lines/1", "DELETE", "admin"), false);
   assert.equal(canSupportUseRoute("/api/portal/product-lines/1/products/2", "PATCH", "portal"), true);
+  assert.equal(canSupportUseRoute("/api/admin/tickets/1", "PUT", "admin"), true);
   assert.equal(canSupportUseRoute("/api/not-portal/products/1", "DELETE", "portal"), false);
 });
 

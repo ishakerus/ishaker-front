@@ -1,5 +1,6 @@
 import {
   Box,
+  Badge,
   Button,
   Flex,
   Heading,
@@ -14,9 +15,11 @@ import {
 } from "@chakra-ui/react";
 import { FiMenu, FiPower } from "react-icons/fi";
 import Link from "next/link";
+import { useEffect, useState } from "react";
 
 const adminLinks = [
   ["/admin/dashboard", "Clients"],
+  ["/admin/tickets", "Tickets"],
   ["/admin/patches", "Patches"],
   ["/admin/currencies", "Currencies"],
   ["/admin/presets", "Presets"],
@@ -27,6 +30,29 @@ const adminLinks = [
 ];
 
 export function AdminHeader({ title = "Client machines" }: { title?: string }) {
+  const [unresolvedTickets, setUnresolvedTickets] = useState(0);
+
+  useEffect(() => {
+    const loadTicketCount = async () => {
+      const response = await fetch("/api/admin/tickets/count", {
+        cache: "no-store",
+      });
+      const payload = await response.json().catch(() => null);
+      if (response.ok) setUnresolvedTickets(Number(payload?.count || 0));
+    };
+    const refresh = () => void loadTicketCount();
+
+    void loadTicketCount();
+    window.addEventListener("focus", refresh);
+    window.addEventListener("tickets-updated", refresh);
+    const interval = window.setInterval(refresh, 60_000);
+    return () => {
+      window.removeEventListener("focus", refresh);
+      window.removeEventListener("tickets-updated", refresh);
+      window.clearInterval(interval);
+    };
+  }, []);
+
   const logout = async () => {
     await fetch("/api/admin/logout", { method: "POST" });
     window.location.href = "/login";
@@ -78,6 +104,17 @@ export function AdminHeader({ title = "Client machines" }: { title?: string }) {
           {adminLinks.map(([href, label]) => (
             <Button key={href} as={Link} href={href} size="sm" variant="ghost">
               {label}
+              {href === "/admin/tickets" && unresolvedTickets > 0 ? (
+                <Badge
+                  ml="2"
+                  colorScheme="red"
+                  borderRadius="full"
+                  minW="5"
+                  textAlign="center"
+                >
+                  {unresolvedTickets}
+                </Badge>
+              ) : null}
             </Button>
           ))}
           <Button
@@ -122,6 +159,11 @@ export function AdminHeader({ title = "Client machines" }: { title?: string }) {
                 _focus={{ bg: "whiteAlpha.100" }}
               >
                 {label}
+                {href === "/admin/tickets" && unresolvedTickets > 0 ? (
+                  <Badge ml="auto" colorScheme="red" borderRadius="full">
+                    {unresolvedTickets}
+                  </Badge>
+                ) : null}
               </MenuItem>
             ))}
             <MenuDivider borderColor="whiteAlpha.200" />

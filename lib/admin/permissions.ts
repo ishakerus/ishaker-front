@@ -3,6 +3,7 @@ const writableCollections = new Set([
   "languages", "translations", "translation-entries", "translation-sets", "voice-clips",
   "products", "product-lines", "components", "tastes", "splashes", "circles",
   "promo-codes", "portal-registration-requests", "door-accesses", "tutorials",
+  "tickets",
 ]);
 
 // These are the records a client can remove through an ownership-checked
@@ -32,7 +33,7 @@ export const canSupportUseRoute = (path: string, method: string, scope: "admin" 
     if (method === "DELETE") return false;
     if (/^\/api\/admin\/machines\/\d+\/cabinet$/.test(path)) return method === "POST";
     if (path === "/api/admin/cabinet/exit") return method === "POST";
-    return /^\/api\/admin\/(machines|currencies|presets|languages|translations|translation-sets|voice-clips|products|product-lines|tutorials)(?:\/\d+)?(?:\/(free-mode|apply|entries))?$/.test(path);
+    return /^\/api\/admin\/(machines|currencies|presets|languages|translations|translation-sets|voice-clips|products|product-lines|tutorials|tickets)(?:\/\d+)?(?:\/(free-mode|apply|entries))?$/.test(path);
   }
   // A valid support cabinet is bound to one portal user/client. The portal
   // handlers keep their normal ownership checks, so support can safely use the
