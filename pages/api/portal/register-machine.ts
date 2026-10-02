@@ -14,16 +14,6 @@ import {
   registerPortalUserAsService,
   requestStrapiRestAsService,
 } from "../../../services/server/strapiClient";
-import {
-  changeTelemetryMachineOrganization,
-  createTelemetryOrganization,
-  findTelemetryMachineBySerial,
-  getMissingTelemetryEnvKeys,
-  getTelemetryUserUuid,
-  isTelemetryConfigured,
-  provisionTelemetryMachineSetup,
-  resolveTelemetryOrganizationId,
-} from "../../../services/server/telemetryClient";
 import type { Client, Currency, Machine } from "../../../types/strapi";
 import { updateMachineRegistrationData } from "../../../services/server/machineRegistration";
 import {
@@ -63,56 +53,10 @@ const getErrorPayload = (error: unknown) => {
   };
 };
 
-const getTelemetryErrorPayload = (error: unknown) => {
-  const apiError = error as {
-    status?: number;
-    response?: unknown;
-    message?: string;
-  };
-
-  return {
-    status: apiError.status && apiError.status >= 400 ? apiError.status : 502,
-    message: apiError.message || "Telemetry sync failed.",
-    details: apiError.response || null,
-  };
-};
-
 const getId = (value: unknown) => {
   const id = (value as { id?: string | number } | null)?.id;
   return id === undefined || id === null ? null : id;
 };
-
-const getTelemetryId = (value: unknown): number | null => {
-  const id = getId(value);
-  if (typeof id === "number") return id;
-  if (typeof id === "string" && /^\d+$/.test(id)) return Number(id);
-
-  if (value && typeof value === "object") {
-    const record = value as Record<string, unknown>;
-    const nestedId =
-      getTelemetryId(record.machine) ||
-      getTelemetryId(record.organization) ||
-      getTelemetryId(record.data);
-    if (nestedId) return nestedId;
-
-    const explicitId = record.machineId || record.organizationId;
-    if (typeof explicitId === "number") return explicitId;
-    if (typeof explicitId === "string" && /^\d+$/.test(explicitId)) return Number(explicitId);
-  }
-
-  return null;
-};
-
-const getRegistrationCode = (payload: any) =>
-  asString(payload?.registrationKey) ||
-  asString(payload?.registrationCode) ||
-  asString(payload?.registration_code) ||
-  asString(payload?.qrPayload?.registrationKey) ||
-  asString(payload?.qrPayload?.registrationCode) ||
-  asString(payload?.machine?.registrationKey) ||
-  asString(payload?.machine?.registrationCode) ||
-  asString(payload?.key) ||
-  asString(payload?.machineKey);
 
 const contactLabel = (params: {
   messengerType: string;
@@ -256,138 +200,6 @@ const updateClientLocation = async (
     method: "PUT",
     body: JSON.stringify({ data: location }),
   });
-
-const updateClientPortalAccess = async (
-  clientId: string | number,
-  email: string,
-  telemetryOrganizationId?: number | null,
-) =>
-  requestStrapiRestAsService<Client>(`/api/clients/${clientId}`, {
-    method: "PUT",
-    body: JSON.stringify({
-      data: {
-        portal_email: email,
-        portal_access_enabled: true,
-        portal_auth_provider: "local",
-        ...(telemetryOrganizationId ? { telemetry_organization_id: telemetryOrganizationId } : {}),
-      },
-    }),
-  });
-
-
-const syncTelemetry = async (params: {
-  client: Client;
-  machine: Machine;
-  company: string;
-  contactName: string;
-  email: string;
-  messengerType: string;
-  messengerCountryCode: string;
-  messengerValue: string;
-  currency: Currency;
-}) => {
-  if (!isTelemetryConfigured()) {
-    const missing = getMissingTelemetryEnvKeys();
-    throw new Error(
-      `Telemetry environment is not configured. Missing: ${missing.join(", ")}`,
-    );
-  }
-
-  const userUuid = await getTelemetryUserUuid();
-  if (!userUuid) {
-    throw new Error("Telemetry root user UUID could not be read.");
-  }
-
-  const existingOrganizationId = await resolveTelemetryOrganizationId(params.client);
-  let organizationId = existingOrganizationId;
-
-  if (!organizationId) {
-    const created = await createTelemetryOrganization({
-      name: params.company,
-      description: `Created from iShaker portal for ${params.email}.`,
-      currency: params.currency.code,
-      isTest: false,
-      enabledModules: [],
-      isUsedLocalProductBase: false,
-      isDocumentUploadEnabled: false,
-      contacts: [
-        {
-          name: params.contactName,
-          contact: contactLabel(params),
-        },
-      ],
-    });
-
-    organizationId = getTelemetryId(created) || (await resolveTelemetryOrganizationId({
-      company: params.company,
-    }));
-  }
-
-  if (!organizationId) {
-    throw new Error("Telemetry organization was not resolved after create.");
-  }
-
-  let telemetryNoteSuffix = "";
-  if (params.client.telemetry_organization_id !== organizationId) {
-    await updateClientPortalAccess(params.client.id, params.email, organizationId).catch((error) => {
-      console.error("[portal/register-machine] telemetry org id save failed:", error);
-      telemetryNoteSuffix =
-        " Strapi telemetry organization id was not saved; check that the client.telemetry_organization_id field is deployed.";
-    });
-  }
-
-  const existingMachine = await findTelemetryMachineBySerial(params.machine.serial_number);
-
-  if (existingMachine?.machine?.id) {
-    if (existingMachine.organizationId !== organizationId) {
-      await changeTelemetryMachineOrganization(
-        existingMachine.machine.id,
-        organizationId,
-        userUuid,
-      );
-
-      return {
-        status: "moved",
-        organizationId,
-        machineId: existingMachine.machine.id,
-        note: `Telemetry machine moved from organization ${existingMachine.organizationId} to ${organizationId}.${telemetryNoteSuffix}`,
-      };
-    }
-
-    return {
-      status: "exists",
-      organizationId,
-      machineId: existingMachine.machine.id,
-      note: `Telemetry machine already exists in organization ${organizationId}.${telemetryNoteSuffix}`,
-    };
-  }
-
-  const provisioned = await provisionTelemetryMachineSetup(userUuid, {
-    organizationId,
-    serialNumber: params.machine.serial_number,
-    shipmentDate: new Date().toISOString().slice(0, 10),
-  });
-  const registrationCode = getRegistrationCode(provisioned);
-
-  if (registrationCode) {
-    await requestStrapiRestAsService(`/api/machines/${params.machine.id}`, {
-      method: "PUT",
-      body: JSON.stringify({
-        data: {
-          telemetry_reg_code: registrationCode,
-        },
-      }),
-    });
-  }
-
-  return {
-    status: "provisioned",
-    organizationId,
-    machineId: getTelemetryId(provisioned),
-    registrationCode,
-    note: `Telemetry machine provisioned in organization ${organizationId}.${telemetryNoteSuffix}`,
-  };
-};
 
 async function handler(req: NextApiRequest, res: NextApiResponse) {
   if (req.method !== "POST") {
@@ -703,32 +515,6 @@ async function handler(req: NextApiRequest, res: NextApiResponse) {
     presetNote = `Catalog not seeded: ${payload.message}.`;
   }
 
-  let telemetryResult: {
-    status: string;
-    organizationId?: number | null;
-    machineId?: number | null;
-    registrationCode?: string;
-    note?: string;
-  } | null = null;
-  let telemetryErrorNote = "";
-  try {
-    telemetryResult = await syncTelemetry({
-      client,
-      machine: assignedMachine,
-      company: nickname,
-      contactName,
-      email,
-      messengerType,
-      messengerCountryCode,
-      messengerValue,
-      currency,
-    });
-  } catch (error) {
-    console.error("[portal/register-machine] telemetry sync failed:", error);
-    const payload = getTelemetryErrorPayload(error);
-    telemetryErrorNote = `Telemetry sync pending: ${payload.message}`;
-  }
-
   const data = {
     serial_number: serialNumber,
     machine_title: assignedMachine.title,
@@ -746,8 +532,6 @@ async function handler(req: NextApiRequest, res: NextApiResponse) {
         ? `WhatsApp: ${messengerCountryCode} ${messengerValue}`.trim()
         : "",
       presetNote,
-      telemetryResult?.note || "",
-      telemetryErrorNote,
     ]
       .filter(Boolean)
       .join("\n"),
@@ -771,7 +555,6 @@ async function handler(req: NextApiRequest, res: NextApiResponse) {
       ok: true,
       response,
       machine: assignedMachine,
-      telemetry: telemetryResult || { status: "pending" },
       accountCreated: !isExistingAccount,
     });
   } catch (error) {

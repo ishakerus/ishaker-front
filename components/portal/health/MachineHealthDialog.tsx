@@ -7,6 +7,7 @@ import {
   ModalOverlay,
 } from "@chakra-ui/react";
 import type { MachineHealthIndicator } from "../../../types/machineHealth";
+import type { PortalMachineCell } from "../../../types/portal";
 import type { Machine } from "../../../types/strapi";
 import { CupsDialogContent } from "./CupsDialogContent";
 import { DoorLockDialogContent } from "./DoorLockDialogContent";
@@ -35,12 +36,14 @@ const titles: Record<HealthDialogKind, string> = {
 export function MachineHealthDialog({
   kind,
   machine,
+  initialCells,
   onlineStatus,
   onClose,
   onSaved,
 }: {
   kind: HealthDialogKind | null;
   machine: Machine;
+  initialCells?: PortalMachineCell[];
   onlineStatus?: MachineHealthIndicator;
   onClose: () => void;
   onSaved: () => void;
@@ -69,6 +72,7 @@ export function MachineHealthDialog({
           {kind === "powders" ? (
             <PowdersDialogContent
               machine={machine}
+              initialCells={initialCells}
               onSaved={onSaved}
               onClose={onClose}
             />

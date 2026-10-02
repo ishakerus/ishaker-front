@@ -363,7 +363,7 @@ export function Stats({ showMachines = false }: StatsProps) {
         .sort((left, right) => right.cups_total - left.cups_total),
     [fleet],
   );
-  const telemetryCountryCount = useMemo(
+  const activeCountryCount = useMemo(
     () =>
       new Set(
         (fleet?.machines || [])
@@ -422,7 +422,7 @@ export function Stats({ showMachines = false }: StatsProps) {
       <CustomTitle
         as={showMachines ? "h1" : "h2"}
         title={showMachines ? "Realtime fleet stats" : "Shakes happening now"}
-        subtitle="Recent drinks and hourly fleet telemetry from iShaker machines around the world."
+        subtitle="Recent drinks and hourly fleet activity from iShaker machines around the world."
         mt="0"
         mb={{ base: "5", md: "7" }}
         fontSize={{ base: "3xl", md: "6xl" }}
@@ -447,7 +447,7 @@ export function Stats({ showMachines = false }: StatsProps) {
               "Machines reporting",
               `${totals.machines_reporting} / ${totals.machines_listed}`,
             ],
-            ["Telemetry countries", formatCount(telemetryCountryCount)],
+            ["Active countries", formatCount(activeCountryCount)],
           ].map(([label, value]) => (
             <Box
               key={label}

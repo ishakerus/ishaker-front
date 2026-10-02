@@ -21,12 +21,20 @@ export const getMachineCells = async (
     "url",
   );
   params.set(
+    "populate[product][populate][taste][populate][main][fields][2]",
+    "formats",
+  );
+  params.set(
     "populate[product][populate][custom_main][fields][0]",
     "name",
   );
   params.set(
     "populate[product][populate][custom_main][fields][1]",
     "url",
+  );
+  params.set(
+    "populate[product][populate][custom_main][fields][2]",
+    "formats",
   );
   params.set(
     "populate[product][populate][taste][populate][default_circle][fields][0]",
@@ -41,8 +49,16 @@ export const getMachineCells = async (
     "url",
   );
   params.set(
+    "populate[product][populate][product_line][populate][cups][populate][image][fields][1]",
+    "formats",
+  );
+  params.set(
     "populate[product][populate][cup][populate][image][fields][0]",
     "url",
+  );
+  params.set(
+    "populate[product][populate][cup][populate][image][fields][1]",
+    "formats",
   );
   params.set("populate[product][populate][dosage]", "*");
   params.set("populate[product][fields][0]", "name");

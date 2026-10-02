@@ -1,120 +1,64 @@
-import type { GetServerSideProps } from "next";
+import dynamic from "next/dynamic";
+import { useRouter } from "next/router";
+import { useEffect } from "react";
+import type { NewProductLinePageProps } from "../../components/portal/product-lines/NewProductLinePage";
 import {
-  NewProductLinePage,
-  type NewProductLinePageProps,
-} from "../../components/portal/product-lines";
-import { requirePortalSession } from "../../lib/portal/auth";
-import { requestWithSplashOwnershipFallback } from "../../lib/portal/splashOwnership";
-import { requestStrapiRestAsService } from "../../services/server/strapiClient";
-import type {
-  PortalProductLine,
-  PortalSplash,
-} from "../../types/portal";
+  PortalPageFailure,
+  PortalPageLoading,
+  PortalPageContent,
+} from "../../components/portal/PortalPageState";
+import { usePortalPage } from "../../lib/portal/usePortalPage";
 
-export default NewProductLinePage;
+const NewProductLinePage = dynamic<NewProductLinePageProps>(
+  () =>
+    // @ts-expect-error -- Next resolves the extensionless TSX source import.
+    import("../../components/portal/product-lines/NewProductLinePage").then(
+      (module) => module.NewProductLinePage,
+    ),
+  {
+    ssr: false,
+    loading: () => <PortalPageLoading label="New product line" />,
+  },
+);
 
-export const getServerSideProps: GetServerSideProps<NewProductLinePageProps> = async (
-  context,
-) => {
-  const result = await requirePortalSession(context);
-  if ("redirect" in result) return { redirect: result.redirect };
+const first = (value: string | string[] | undefined) =>
+  Array.isArray(value) ? value[0] || "" : value || "";
 
-  const rootParams = new URLSearchParams();
-  rootParams.set("filters[author][username][$eq]", "root");
-  rootParams.set("fields[0]", "name");
-  rootParams.set("fields[1]", "isPopular");
-  rootParams.set("fields[2]", "is_template");
-  rootParams.set("populate[can_be_added_to][fields][0]", "name");
-  rootParams.set("populate[cups][populate][image]", "*");
-  rootParams.set("populate[cups][populate][default_splash][populate][images]", "*");
-  rootParams.set("populate[custom_splash]", "*");
-  rootParams.set("sort[0]", "isPopular:DESC");
-  rootParams.set("sort[1]", "name:ASC");
-  rootParams.set("pagination[pageSize]", "2000");
-
-  const splashParams = new URLSearchParams();
-  splashParams.set("filters[$or][0][author][username][$eq]", "root");
-  splashParams.set(
-    "filters[$or][1][author][id][$eq]",
-    String(result.session.user.id),
+export default function NewProductLineRoute() {
+  const router = useRouter();
+  useEffect(() => {
+    // @ts-expect-error -- Next resolves the extensionless TSX source import.
+    void import("../../components/portal/product-lines/NewProductLinePage");
+  }, []);
+  const baseProductLineId = first(router.query.baseProductLineId);
+  const params = new URLSearchParams();
+  if (baseProductLineId) {
+    params.set("baseProductLineId", baseProductLineId);
+  }
+  const query = params.toString();
+  const { data, error, mutate } = usePortalPage<NewProductLinePageProps>(
+    router.isReady
+      ? `/api/portal/product-lines/editor${query ? `?${query}` : ""}`
+      : null,
   );
-  splashParams.set("fields[0]", "name");
-  splashParams.set("fields[1]", "color");
-  splashParams.set("fields[2]", "isEmpty");
-  splashParams.set("sort[0]", "name:ASC");
-  splashParams.set("pagination[pageSize]", "2000");
-  const loadSplashes = (params: URLSearchParams) =>
-    requestStrapiRestAsService<PortalSplash[]>(
-      `/api/splashes?${params.toString()}`,
-    );
 
-  const existingParams = new URLSearchParams();
-  if (result.session.access === "client") {
-    existingParams.set(
-      "filters[author][client][id][$eq]",
-      String(result.session.client.id),
-    );
-  } else {
-    existingParams.set(
-      "filters[author][id][$eq]",
-      String(result.session.user.id),
+  if (error) {
+    return (
+      <PortalPageFailure
+        label="New product line"
+        error={error}
+        retry={() => void mutate()}
+      />
     );
   }
-  existingParams.set("fields[0]", "name");
-  existingParams.set("populate[base_product_line][fields][0]", "name");
-  existingParams.set("pagination[pageSize]", "2000");
+  if (!data) return <PortalPageLoading label="New product line" />;
 
-  try {
-    const [rootProductLines, splashes, existingProductLines] =
-      await Promise.all([
-        requestStrapiRestAsService<PortalProductLine[]>(
-          `/api/product-lines?${rootParams.toString()}`,
-        ),
-        requestWithSplashOwnershipFallback(splashParams, loadSplashes, () =>
-          console.warn(
-            "[product-lines/new] splash ownership filtering is unsupported; using the compatible query.",
-          ),
-        ).catch((error) => {
-          console.error(
-            "[product-lines/new] splash option loading failed:",
-            error,
-          );
-          return [];
-        }),
-        requestStrapiRestAsService<PortalProductLine[]>(
-          `/api/product-lines?${existingParams.toString()}`,
-        ),
-      ]);
-    const requestedBaseProductLineId = Array.isArray(
-      context.query.baseProductLineId,
-    )
-      ? context.query.baseProductLineId[0]
-      : context.query.baseProductLineId;
-    const initialBaseProductLineId = rootProductLines.some(
-      (line) => String(line.id) === requestedBaseProductLineId,
-    )
-      ? requestedBaseProductLineId
-      : undefined;
-
-    return {
-      props: {
-        session: result.session,
-        rootProductLines,
-        existingProductLines,
-        splashes,
-        ...(initialBaseProductLineId ? { initialBaseProductLineId } : {}),
-      },
-    };
-  } catch (error) {
-    console.error("[product-lines/new] option loading failed:", error);
-    return {
-      props: {
-        session: result.session,
-        rootProductLines: [],
-        existingProductLines: [],
-        splashes: [],
-        loadError: "Product line options could not be loaded.",
-      },
-    };
-  }
-};
+  return (
+    <PortalPageContent session={data.session}>
+      <NewProductLinePage
+        key={`new:${data.initialBaseProductLineId || "none"}`}
+        {...data}
+      />
+    </PortalPageContent>
+  );
+}

@@ -4,7 +4,6 @@ import {
   Box,
   SimpleGrid,
   Stack,
-  VStack,
   Table,
   Tbody,
   Td,
@@ -23,31 +22,19 @@ import { MachineFreeMode } from "../../components/machines/MachineFreeMode";
 import { NayaxSettingsSection } from "../../components/portal/NayaxSettingsSection";
 import { PortalShell } from "../../components/portal/PortalShell";
 import { requirePortalSession } from "../../lib/portal/auth";
-import {
-  getTelemetryMachineHome,
-  getTelemetryMachinePrices,
-  getTelemetryMachineStatus,
-  getTelemetryMachineStorage,
-  isTelemetryConfigured,
-  resolveTelemetryMachine,
-} from "../../services/server/telemetryClient";
+import { getMachineCells } from "../../services/server/machineCells";
 import { requestStrapiRestAsService } from "../../services/server/strapiClient";
-import type { PortalSession } from "../../types/portal";
+import type { PortalMachineCell, PortalSession } from "../../types/portal";
 import type { Currency, Language, Machine } from "../../types/strapi";
-import { formatMoney } from "../../lib/portal/currency";
-import { buildMachineHealthRow } from "../../lib/portal/machineHealth";
+import {
+  applyStoredPowderLevels,
+  buildMachineHealthRow,
+} from "../../lib/portal/machineHealth";
 
 type MachineDetailPageProps = {
   session: PortalSession;
   machine: Machine;
-  telemetryConfigured: boolean;
-  telemetryConnected?: boolean;
-  telemetryOrganizationId?: number | null;
-  telemetryReason?: string | null;
-  telemetryStatus?: any | null;
-  telemetryHome?: any | null;
-  telemetryStorage?: any | null;
-  telemetryPrices?: any[] | null;
+  cells: PortalMachineCell[] | null;
   currencies: Currency[];
   languages: Language[];
 };
@@ -104,41 +91,22 @@ const rows = (machine: Machine) => [
   ["Bootstrap version", displayValue(machine.bootstrap_version)],
 ];
 
-const telemetryPriceValue = (price: any) => {
-  const candidate =
-    typeof price === "number" || typeof price === "string"
-      ? price
-      : (price?.price ?? price?.amount ?? price?.value);
-  if (
-    candidate === null ||
-    candidate === undefined ||
-    candidate === "" ||
-    !Number.isFinite(Number(candidate))
-  ) {
-    return null;
-  }
-  return Number(candidate);
-};
-
 export default function MachineDetailPage({
   session,
   machine,
-  telemetryConfigured,
-  telemetryConnected,
-  telemetryOrganizationId,
-  telemetryReason,
-  telemetryStatus,
-  telemetryHome,
-  telemetryStorage,
-  telemetryPrices,
+  cells,
   currencies,
   languages,
 }: MachineDetailPageProps) {
   const router = useRouter();
+  const baseHealth = buildMachineHealthRow(machine);
+  const health = cells
+    ? applyStoredPowderLevels(baseHealth, machine, cells)
+    : baseHealth;
   return (
     <PortalShell
       title={machine.title || "Machine detail"}
-      description="Machine access is scoped to the signed-in client. Live telemetry appears here once the frontend server is configured for the manage.ishakerusa.com API."
+      description="Machine access and status are sourced from the signed-in client's Strapi records."
       clientName={session.client.company}
     >
       <SimpleGrid columns={{ base: 1, xl: 2 }} spacing="6">
@@ -151,10 +119,8 @@ export default function MachineDetailPage({
           <Box flex="1" minW="0" maxW={{ base: "100%", md: "500px" }}>
             <MachineHealthStrip
               machine={machine}
-              health={buildMachineHealthRow(machine, {
-                status: telemetryStatus,
-                storage: telemetryStorage,
-              })}
+              health={health}
+              initialCells={cells || undefined}
               onHealthChanged={() => void router.replace(router.asPath)}
             />
           </Box>
@@ -184,7 +150,10 @@ export default function MachineDetailPage({
           />
         </Box>
         <Box gridColumn={{ xl: "1 / -1" }}>
-          <MachineConsumptionSection machine={machine} />
+          <MachineConsumptionSection
+            machine={machine}
+            initialCells={cells || undefined}
+          />
         </Box>
         <Box gridColumn={{ xl: "1 / -1" }}>
           <NayaxSettingsSection client={session.client} machine={machine} />
@@ -214,122 +183,6 @@ export default function MachineDetailPage({
             </Tbody>
           </Table>
         </Box>
-
-        <Box
-          bg="bg.900"
-          border="1px solid"
-          borderColor="whiteAlpha.100"
-          borderRadius="2xl"
-          p="6"
-        >
-          <VStack spacing="3" align="stretch">
-            <Text color="acid.300" fontWeight="800">
-              Telemetry connection
-            </Text>
-            {!telemetryConfigured ? (
-              <>
-                <Text color="orange.200">
-                  Live telemetry is not configured on this frontend server.
-                </Text>
-                <Text color="bg.300">
-                  Missing env vars: `TELEMETRY_API_BASE`,
-                  `TELEMETRY_KEYCLOAK_TOKEN_URL`, `TELEMETRY_CLIENT_ID`,
-                  `TELEMETRY_SERVICE_USERNAME`, `TELEMETRY_SERVICE_PASSWORD`.
-                </Text>
-              </>
-            ) : telemetryReason ? (
-              <>
-                <Text color="green.300">
-                  Telemetry API connection is working.
-                </Text>
-                {telemetryOrganizationId ? (
-                  <Text color="bg.300">
-                    Resolved organization id: {telemetryOrganizationId}
-                  </Text>
-                ) : null}
-                <Text color="orange.200">
-                  Telemetry machine could not be resolved.
-                </Text>
-                <Text color="bg.300">Reason: {telemetryReason}</Text>
-                <Text color="bg.300">
-                  Strapi serial number: {machine.serial_number || "-"}
-                </Text>
-              </>
-            ) : (
-              <>
-                <Text color="green.300">
-                  Telemetry API connection is working.
-                </Text>
-                {telemetryOrganizationId ? (
-                  <Text color="bg.300">
-                    Resolved organization id: {telemetryOrganizationId}
-                  </Text>
-                ) : null}
-                <Text color="bg.300">
-                  Status:{" "}
-                  {displayValue(
-                    telemetryStatus?.status || telemetryHome?.status,
-                    "Connected",
-                  )}
-                </Text>
-                {typeof telemetryHome?.applicationVersion !== "undefined" ? (
-                  <Text color="bg.300">
-                    App version:{" "}
-                    {displayValue(telemetryHome.applicationVersion)}
-                  </Text>
-                ) : null}
-                {typeof telemetryHome?.isActiveKiosk !== "undefined" ? (
-                  <Text color="bg.300">
-                    Kiosk active: {telemetryHome.isActiveKiosk ? "Yes" : "No"}
-                  </Text>
-                ) : null}
-                {telemetryStorage ? (
-                  <Text color="bg.300">
-                    Storage payload received:{" "}
-                    {Object.keys(telemetryStorage).length} fields
-                  </Text>
-                ) : null}
-              </>
-            )}
-          </VStack>
-        </Box>
-
-        {telemetryPrices?.length ? (
-          <Box
-            bg="bg.900"
-            border="1px solid"
-            borderColor="whiteAlpha.100"
-            borderRadius="2xl"
-            p="6"
-            gridColumn={{ xl: "1 / -1" }}
-          >
-            <Text color="acid.300" fontWeight="800" mb="4">
-              Prices
-            </Text>
-            <Table variant="simple" colorScheme="whiteAlpha">
-              <Tbody>
-                {telemetryPrices.slice(0, 20).map((price, index) => (
-                  <Tr key={index}>
-                    <Td color="bg.300" pl="0">
-                      {displayValue(
-                        price?.name || price?.title || price?.productName,
-                        `Item ${index + 1}`,
-                      )}
-                    </Td>
-                    <Td color="bg.50" pr="0">
-                      {telemetryPriceValue(price) === null
-                        ? "-"
-                        : formatMoney(
-                            telemetryPriceValue(price)!,
-                            machine.currency || session.client.currency,
-                          )}
-                    </Td>
-                  </Tr>
-                ))}
-              </Tbody>
-            </Table>
-          </Box>
-        ) : null}
 
         {machine.fleet_status?.media_keys ? (
           <Alert
@@ -381,9 +234,9 @@ export const getServerSideProps: GetServerSideProps<
     return { notFound: true };
   }
 
-  const telemetryConfigured = isTelemetryConfigured();
   let currencies: Currency[] = [];
   let languages: Language[] = [];
+  let cells: PortalMachineCell[] | null = null;
   try {
     [currencies, languages] = await Promise.all([
       requestStrapiRestAsService<Currency[]>(
@@ -396,71 +249,19 @@ export const getServerSideProps: GetServerSideProps<
   } catch (error) {
     console.error("[machines/detail] currency loading failed:", error);
   }
-
-  const commonProps = {
-    session: result.session,
-    machine,
-    telemetryConfigured,
-    currencies,
-    languages,
-  };
-
-  if (!telemetryConfigured) {
-    return {
-      props: {
-        ...commonProps,
-        telemetryConnected: false,
-      },
-    };
-  }
-
   try {
-    const resolved = await resolveTelemetryMachine({
-      client: result.session.client,
-      serialNumber: machine.serial_number,
-    });
-
-    if (!resolved.machineId) {
-      return {
-        props: {
-          ...commonProps,
-          telemetryConnected: true,
-          telemetryOrganizationId: resolved.organizationId,
-          telemetryReason: resolved.reason,
-        },
-      };
-    }
-
-    const [telemetryStatus, telemetryHome, telemetryStorage, telemetryPrices] =
-      await Promise.all([
-        getTelemetryMachineStatus(resolved.machineId).catch(() => null),
-        getTelemetryMachineHome(resolved.machineId).catch(() => null),
-        getTelemetryMachineStorage(resolved.machineId).catch(() => null),
-        getTelemetryMachinePrices(resolved.machineId).catch(() => null),
-      ]);
-
-    return {
-      props: {
-        ...commonProps,
-        telemetryConnected: true,
-        telemetryOrganizationId: resolved.organizationId,
-        telemetryStatus,
-        telemetryHome,
-        telemetryStorage,
-        telemetryPrices: Array.isArray(telemetryPrices)
-          ? telemetryPrices
-          : null,
-        telemetryReason: null,
-      },
-    };
+    cells = await getMachineCells(machine.id);
   } catch (error) {
-    console.error("[machines/detail] telemetry load failed:", error);
-    return {
-      props: {
-        ...commonProps,
-        telemetryConnected: false,
-        telemetryReason: "telemetry_request_failed",
-      },
-    };
+    console.error("[machines/detail] container loading failed:", error);
   }
+
+  return {
+    props: {
+      session: result.session,
+      machine,
+      cells,
+      currencies,
+      languages,
+    },
+  };
 };

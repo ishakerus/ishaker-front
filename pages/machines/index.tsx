@@ -18,7 +18,11 @@ import { PortalShell } from "../../components/portal/PortalShell";
 import { MachineHealthStrip } from "../../components/portal/machines/MachineHealthStrip";
 import { requirePortalSession } from "../../lib/portal/auth";
 import { getSmallestMediaUrl } from "../../lib/portal/media";
-import type { PortalMachineSummary, PortalSession } from "../../types/portal";
+import type {
+  PortalMachineCell,
+  PortalMachineSummary,
+  PortalSession,
+} from "../../types/portal";
 import type { Machine, SalesSummary } from "../../types/strapi";
 import type { MachineHealthRow } from "../../types/machineHealth";
 import { FaPlus } from "react-icons/fa";
@@ -28,6 +32,10 @@ import { SupportContactBox } from "../../components/shared/SupportContactBox";
 type MachinesPageProps = {
   session: PortalSession;
   machines: PortalMachineSummary[];
+};
+
+type MachineHealthWithCells = MachineHealthRow & {
+  cells?: PortalMachineCell[];
 };
 
 const displayValue = (value: unknown, fallback = "Registered") => {
@@ -57,7 +65,7 @@ const deriveStatusLabel = (machine: Machine) => {
 };
 
 export default function MachinesPage({ session, machines }: MachinesPageProps) {
-  const [healthRows, setHealthRows] = useState<MachineHealthRow[]>([]);
+  const [healthRows, setHealthRows] = useState<MachineHealthWithCells[]>([]);
   const [isHealthLoading, setIsHealthLoading] = useState(true);
   const [salesToday, setSalesToday] = useState<Map<
     string,
@@ -234,6 +242,9 @@ export default function MachinesPage({ session, machines }: MachinesPageProps) {
                 <MachineHealthStrip
                   machine={machine}
                   health={healthByMachineId.get(String(machine.id))}
+                  initialCells={
+                    healthByMachineId.get(String(machine.id))?.cells
+                  }
                   salesToday={
                     salesToday
                       ? {

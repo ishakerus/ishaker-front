@@ -20,7 +20,6 @@ const PORTAL_MACHINE_FIELDS = [
   "city",
   "rustdesk_id",
   "rustdesk_password",
-  "telemetry_reg_code",
   "fleet_status",
   "nayax_terminal_id",
   "controller_fw",

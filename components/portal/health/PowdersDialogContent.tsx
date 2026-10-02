@@ -17,26 +17,50 @@ import { ContainersPreview } from "../product-lines/ContainersPreview";
 
 export function PowdersDialogContent({
   machine,
+  initialCells,
   onSaved,
   onClose,
 }: {
   machine: Machine;
+  initialCells?: PortalMachineCell[];
   onSaved: () => void;
   onClose: () => void;
 }) {
   const toast = useToast();
-  const [cells, setCells] = useState<PortalMachineCell[]>([]);
+  const [cells, setCells] = useState<PortalMachineCell[]>(initialCells || []);
   const [initialAmounts, setInitialAmounts] = useState<Record<string, number>>(
-    {},
+    () =>
+      Object.fromEntries(
+        (initialCells || []).map((cell) => [
+          String(cell.id),
+          Number(cell.amount_kg) || 0,
+        ]),
+      ),
   );
-  const [loading, setLoading] = useState(true);
+  const [loading, setLoading] = useState(initialCells === undefined);
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState("");
   const containerCount = getMachineContainerCount(machine.machine_type);
 
   useEffect(() => {
+    if (initialCells !== undefined) {
+      setCells(initialCells);
+      setInitialAmounts(
+        Object.fromEntries(
+          initialCells.map((cell) => [
+            String(cell.id),
+            Number(cell.amount_kg) || 0,
+          ]),
+        ),
+      );
+      setError("");
+      setLoading(false);
+      return;
+    }
+
     let active = true;
     setLoading(true);
+    setError("");
     void fetch(`/api/portal/machines/${machine.id}/cells`)
       .then(async (response) => {
         const payload = await response.json().catch(() => null);
@@ -64,7 +88,7 @@ export function PowdersDialogContent({
     return () => {
       active = false;
     };
-  }, [machine.id]);
+  }, [initialCells, machine.id]);
 
   const visibleCells = useMemo(
     () => cells.filter((cell) => cell.product),

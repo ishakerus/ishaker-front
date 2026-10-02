@@ -170,11 +170,7 @@ function MachineCard({
   onShowPatch,
 }: MachineCardProps) {
   const patchVersion = getMachinePatchNumber(machine);
-  const health = buildMachineHealthRow(
-    machine,
-    null,
-    readinessReferenceTime,
-  ).online;
+  const health = buildMachineHealthRow(machine, readinessReferenceTime).online;
   const statusColor =
     health.state === "ok"
       ? "green"

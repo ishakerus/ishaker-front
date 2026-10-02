@@ -9,18 +9,20 @@ import {
   VStack,
 } from "@chakra-ui/react";
 import type { IconType } from "react-icons";
-import { Fragment, useState } from "react";
+import { Fragment, useMemo, useState } from "react";
 import { BiSolidInfoCircle } from "react-icons/bi";
 import { CiCoffeeCup } from "react-icons/ci";
 import { FaBoxOpen, FaChartLine, FaLock, FaTint, FaWifi } from "react-icons/fa";
 import Link from "next/link";
 import { formatMoney } from "../../../lib/portal/currency";
+import { getSmallestMediaUrl } from "../../../lib/portal/media";
 import type {
   HealthState,
   MachineHealthIndicator,
   MachineHealthRow,
 } from "../../../types/machineHealth";
 import type { Currency, Machine } from "../../../types/strapi";
+import type { PortalMachineCell } from "../../../types/portal";
 import {
   MachineHealthDialog,
   type HealthDialogKind,
@@ -29,6 +31,7 @@ import {
 type MachineHealthStripProps = {
   machine: Machine;
   health?: MachineHealthRow;
+  initialCells?: PortalMachineCell[];
   salesToday?: {
     revenue: number;
     cups: number;
@@ -82,6 +85,7 @@ const HealthItem = ({
   onClick,
   powderLevels,
   levelPercent,
+  onPrefetch,
 }: {
   title: string;
   icon: IconType;
@@ -90,6 +94,7 @@ const HealthItem = ({
   onClick: () => void;
   powderLevels?: Array<number | null>;
   levelPercent?: number;
+  onPrefetch?: () => void;
 }) => {
   const color = stateColor[indicator.state];
   const background = stateBackground[indicator.state];
@@ -101,6 +106,9 @@ const HealthItem = ({
       type="button"
       align="start"
       onClick={onClick}
+      onPointerEnter={onPrefetch}
+      onFocus={onPrefetch}
+      onTouchStart={onPrefetch}
       aria-label={`Open ${title} details`}
       spacing="1"
       minW="0"
@@ -140,100 +148,112 @@ const HealthItem = ({
             </Text>
             <BiSolidInfoCircle size="1rem" />
           </HStack>
-          {powderLevels?.length ? (
-            <HStack
-              spacing="2px"
-              h="12px"
-              align="end"
-              aria-label={`Powder levels: ${powderLevels
-                .map((level) =>
-                  level === null ? "empty" : `${Math.round(level)}%`,
-                )
-                .join(", ")}`}
-            >
-              {powderLevels.map((level, index) => {
-                const normalized =
-                  level === null ? 0 : Math.max(0, Math.min(100, level));
-                const fillColor =
-                  normalized < 10
-                    ? "red.400"
-                    : normalized < 20
-                      ? "orange.400"
-                      : normalized < 40
-                        ? "yellow.400"
-                        : "green.400";
-                const fillHeight =
-                  normalized < 10
-                    ? "1px"
-                    : normalized < 20
-                      ? "3px"
-                      : `${Math.max(1, Math.round(normalized / 10))}px`;
-
-                return (
-                  <Box
-                    key={index}
-                    position="relative"
-                    w="6px"
-                    h="10px"
-                    overflow="hidden"
-                    borderRadius="1px"
-                    bg="bg.500"
-                  >
-                    {level !== null && normalized > 0 ? (
-                      <Box
-                        position="absolute"
-                        insetX="0"
-                        bottom="0"
-                        h={fillHeight}
-                        bg={fillColor}
-                      />
-                    ) : null}
-                  </Box>
-                );
-              })}
-            </HStack>
-          ) : levelPercent !== undefined ? (
-            <HStack
-              spacing="1.5"
-              h="12px"
-              aria-label={`${title} level: ${Math.round(levelPercent)}%`}
-            >
-              <Box
-                position="relative"
-                w="6px"
-                h="10px"
-                flex="0 0 auto"
-                overflow="hidden"
-                borderRadius="1px"
-                bg="bg.500"
+          <HStack w="100%" spacing="1" justifyContent="space-between">
+            {powderLevels?.length ? (
+              <HStack
+                spacing="2px"
+                h="12px"
+                align="end"
+                aria-label={`Powder levels: ${powderLevels
+                  .map((level) =>
+                    level === null ? "empty" : `${Math.round(level)}%`,
+                  )
+                  .join(", ")}`}
               >
-                {levelPercent > 0 ? (
-                  <Box
-                    position="absolute"
-                    insetX="0"
-                    bottom="0"
-                    h={`${Math.max(1, Math.round(levelPercent / 10))}px`}
-                    bg={`${color}.400`}
-                  />
-                ) : null}
-              </Box>
+                {powderLevels.map((level, index) => {
+                  const normalized =
+                    level === null ? 0 : Math.max(0, Math.min(100, level));
+                  const fillColor =
+                    normalized < 10
+                      ? "red.400"
+                      : normalized < 20
+                        ? "orange.400"
+                        : normalized < 40
+                          ? "yellow.400"
+                          : "green.400";
+                  const fillHeight =
+                    normalized < 10
+                      ? "1px"
+                      : normalized < 20
+                        ? "3px"
+                        : `${Math.max(1, Math.round(normalized / 10))}px`;
+
+                  return (
+                    <Box
+                      key={index}
+                      position="relative"
+                      w="6px"
+                      h="10px"
+                      overflow="hidden"
+                      borderRadius="1px"
+                      bg="bg.500"
+                    >
+                      {level !== null && normalized > 0 ? (
+                        <Box
+                          position="absolute"
+                          insetX="0"
+                          bottom="0"
+                          h={fillHeight}
+                          bg={fillColor}
+                        />
+                      ) : null}
+                    </Box>
+                  );
+                })}
+              </HStack>
+            ) : levelPercent !== undefined ? (
+              <HStack
+                spacing="1.5"
+                h="12px"
+                minW="0"
+                aria-label={`${title} level: ${Math.round(levelPercent)}%`}
+              >
+                <Box
+                  position="relative"
+                  w="6px"
+                  h="10px"
+                  flex="0 0 auto"
+                  overflow="hidden"
+                  borderRadius="1px"
+                  bg="bg.500"
+                >
+                  {levelPercent > 0 ? (
+                    <Box
+                      position="absolute"
+                      insetX="0"
+                      bottom="0"
+                      h={`${Math.max(1, Math.round(levelPercent / 10))}px`}
+                      bg={`${color}.400`}
+                    />
+                  ) : null}
+                </Box>
+                <Text
+                  color="bg.50"
+                  fontSize="xs"
+                  fontWeight="700"
+                  noOfLines={1}
+                >
+                  {indicator.label}
+                </Text>
+              </HStack>
+            ) : (
               <Text color="bg.50" fontSize="xs" fontWeight="700" noOfLines={1}>
                 {indicator.label}
               </Text>
-            </HStack>
-          ) : (
-            <Text color="bg.50" fontSize="xs" fontWeight="700" noOfLines={1}>
-              {indicator.label}
-            </Text>
-          )}
+            )}
+            {indicator.source !== "ops" && indicator.source !== "own" ? (
+              <Badge
+                flex="0 0 auto"
+                colorScheme={color}
+                fontSize="8px"
+                lineHeight="14px"
+              >
+                {indicator.source}
+              </Badge>
+            ) : null}
+          </HStack>
         </Box>
       </HStack>
-
-      {indicator.source !== "ops" && indicator.source !== "own" ? (
-        <Badge colorScheme={color} fontSize="8px" lineHeight="14px">
-          {indicator.source}
-        </Badge>
-      ) : null}
     </VStack>
   );
 };
@@ -315,12 +335,39 @@ const TodaySalesItem = ({
 export function MachineHealthStrip({
   machine,
   health,
+  initialCells,
   salesToday,
   isSalesLoading = false,
   isLoading = false,
   onHealthChanged = () => undefined,
 }: MachineHealthStripProps) {
   const [dialog, setDialog] = useState<HealthDialogKind | null>(null);
+  const powderImageUrls = useMemo(
+    () =>
+      Array.from(
+        new Set([
+          "/container.png",
+          ...(initialCells || []).flatMap((cell) => [
+            getSmallestMediaUrl(
+              cell.product?.custom_main || cell.product?.taste?.main,
+            ),
+            getSmallestMediaUrl(
+              cell.product?.cup?.image ||
+                cell.product?.product_line?.cups?.[0]?.image,
+            ),
+          ]),
+        ].filter(Boolean)),
+      ),
+    [initialCells],
+  );
+  const preloadPowderImages = () => {
+    if (typeof window === "undefined") return;
+    powderImageUrls.forEach((url) => {
+      const image = new window.Image();
+      image.decoding = "async";
+      image.src = url;
+    });
+  };
   if (isLoading) {
     return (
       <SimpleGrid columns={3} spacing="2" aria-label="Loading machine health">
@@ -373,6 +420,7 @@ export function MachineHealthStrip({
       icon: FaBoxOpen,
       indicator: health?.powders || noData,
       powderLevels: health?.powderLevels,
+      onPrefetch: preloadPowderImages,
     },
     {
       title: "Empty Cups",
@@ -420,6 +468,7 @@ export function MachineHealthStrip({
       <MachineHealthDialog
         kind={dialog}
         onlineStatus={health?.online}
+        initialCells={initialCells}
         machine={{
           ...machine,
           water_type: health?.waterType ?? machine.water_type,

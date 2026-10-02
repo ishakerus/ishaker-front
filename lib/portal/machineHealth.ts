@@ -3,9 +3,11 @@ import type { PortalMachineCell } from "../../types/portal";
 import type {
   MachineHealthIndicator,
   MachineHealthRow,
-  TelemetryHealthInput,
 } from "../../types/machineHealth";
-import { getMachineContainerCount } from "./containerSlots";
+import {
+  getContainerMaxAmountKg,
+  getMachineContainerCount,
+} from "./containerSlots";
 
 const STALE_AFTER_MS = 10 * 60 * 1000;
 // A kiosk that has just been relaunched has not counted a frame yet. FleetPulse restarts it
@@ -94,7 +96,7 @@ export const applyStoredPowderLevels = (
     return row;
   }
 
-  const maximumKg = containerCount === 8 ? 2 : 1;
+  const maximumKg = getContainerMaxAmountKg(containerCount);
   const powderLevels = Array.from({ length: containerCount }, (_, index) => {
     const cell = cells.find((candidate) => candidate.position === index + 1);
     if (!cell?.product || cell.isActive === false) return null;
@@ -278,86 +280,8 @@ const ownHealth = (machine: Machine, now: number): MachineHealthRow | null => {
   };
 };
 
-const telemetryIndicators = (
-  telemetry?: TelemetryHealthInput | null,
-  configuredContainerCount?: number | null,
-) => {
-  const connectionStatus = String(
-    telemetry?.status?.connectionStatus || "",
-  ).toUpperCase();
-  const online: MachineHealthIndicator =
-    connectionStatus === "ONLINE"
-      ? { state: "ok", label: "Online", source: "telemetry" }
-      : connectionStatus === "OFFLINE"
-        ? { state: "error", label: "Offline", source: "telemetry" }
-        : unknown();
-
-  const storage = telemetry?.storage || {};
-  const waters = Array.isArray(storage.cellWaters) ? storage.cellWaters : [];
-  const waterCurrent = waters.reduce(
-    (sum: number, cell: any) => sum + (finiteNumber(cell?.volume) || 0),
-    0,
-  );
-  const waterMax = waters.reduce(
-    (sum: number, cell: any) => sum + (finiteNumber(cell?.maxVolume) || 0),
-    0,
-  );
-  const water: MachineHealthIndicator = waters.length
-    ? {
-        state: waterLevelState(waterCurrent / 1000),
-        label: waterMax
-          ? `${liters(waterCurrent)} / ${liters(waterMax)}`
-          : liters(waterCurrent),
-        source: "telemetry",
-      }
-    : unknown();
-
-  const cells = Array.isArray(storage.cells) ? storage.cells : [];
-  const containerCount = configuredContainerCount || cells.length;
-  const powderLevels = Array.from({ length: containerCount }, (_, index) => {
-    const cell = cells.find(
-      (candidate: any, candidateIndex: number) =>
-        Number(candidate?.position ?? candidate?.cellNumber ?? candidateIndex + 1) ===
-        index + 1,
-    );
-    if (!cell || cell?.isActive === false) return null;
-    const volume = finiteNumber(cell?.volume);
-    const isAssigned =
-      cell?.productId != null || Boolean(cell?.productName) || (volume !== null && volume > 0);
-    if (!isAssigned || volume === null || volume <= 0) return null;
-    const level = fillPercentage(cell?.volume, cell?.maxVolume);
-    return level > 0 ? level : null;
-  });
-  const lowCells = powderLevels.filter(
-    (level): level is number => level !== null && level < 40,
-  );
-  const powders: MachineHealthIndicator = cells.length
-    ? {
-        state: powderLevelsState(powderLevels),
-        label: lowCells.length ? `${lowCells.length} low` : `${cells.length} OK`,
-        source: "telemetry",
-      }
-    : unknown();
-
-  const cupCells = Array.isArray(storage.cellCups) ? storage.cellCups : [];
-  const cupCount = cupCells.reduce(
-    (sum: number, cell: any) => sum + (finiteNumber(cell?.volume) || 0),
-    0,
-  );
-  const cups: MachineHealthIndicator = cupCells.length
-    ? {
-      state: cupsLevelState(cupCount),
-        label: `${cupCount} left`,
-        source: "telemetry",
-      }
-    : unknown();
-
-  return { online, water, powders, powderLevels, cups };
-};
-
 export const buildMachineHealthRow = (
   machine: Machine,
-  telemetry?: TelemetryHealthInput | null,
   now = Date.now(),
 ): MachineHealthRow => {
   const waterType = machine.water_type || null;
@@ -365,29 +289,18 @@ export const buildMachineHealthRow = (
   const cupsAmount = finiteNumber(machine.cups_amount);
   const persisted = { waterType, waterAmountLiters, cupsAmount };
   const own = ownHealth(machine, now);
-  const fallback = telemetryIndicators(
-    telemetry,
-    getMachineContainerCount(machine.machine_type),
-  );
   const fleet = machine.fleet_status as Record<string, unknown> | null | undefined;
   const fleetAt = typeof fleet?.at === "string" ? fleet.at : null;
   const fleetFresh = Boolean(fleetAt && !isStale(fleetAt, now));
   const fleetHealthy = fleet?.sweep === "ok" && fleet?.ssh_ok === true;
-  // An SSH sweep only tells us whether FleetPulse can open a remote shell. A failed
-  // sweep must not call the whole machine Offline when the cabinet is actively connected
-  // to telemetry. Conversely, a successful SSH sweep is strong positive evidence even if
-  // the third-party status has not caught up yet.
+  // A successful SSH sweep is positive evidence that the machine is online.
   const currentOnline: MachineHealthIndicator = fleetFresh && fleetHealthy
     ? { state: "ok", label: "Online", source: "ops", at: fleetAt }
-    : fallback.online.state === "ok"
-      ? fallback.online
-      : fleetAt
-        ? fleetFresh
-          ? { state: "error", label: "Offline", source: "ops", at: fleetAt }
-          : fallback.online.state !== "unknown"
-            ? fallback.online
-            : { state: "unknown", label: "Stale", source: "ops", at: fleetAt }
-        : fallback.online;
+    : fleetAt
+      ? fleetFresh
+        ? { state: "error", label: "Offline", source: "ops", at: fleetAt }
+        : { state: "unknown", label: "Stale", source: "ops", at: fleetAt }
+      : unknown();
   const online: MachineHealthIndicator = {
     ...currentOnline,
     // `at` is the time of the latest status report. When that report says Offline,
@@ -450,9 +363,9 @@ export const buildMachineHealthRow = (
               label: `${waterAmountLiters.toFixed(1)} L`,
               source: "ops",
             }
-          : fallback.water,
-    powders: fallback.powders,
-    powderLevels: fallback.powderLevels,
+          : unknown(),
+    powders: unknown(),
+    powderLevels: undefined,
     cups:
       cupsAmount !== null
         ? {
@@ -460,7 +373,7 @@ export const buildMachineHealthRow = (
             label: `${cupsAmount} left`,
             source: "ops",
           }
-        : fallback.cups,
+          : unknown(),
     ...persisted,
   };
 };

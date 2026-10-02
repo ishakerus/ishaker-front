@@ -20,7 +20,7 @@ export type FeatureItem = {
 };
 
 export const stats: StatItem[] = [
-  // These two values are marketing claims; they are not fleet-telemetry counts.
+  // These two values are marketing claims; they are not live fleet counts.
   { label: "Machines sold", value: "107" },
   { label: "Countries covered", value: "17" },
   // StatsSection replaces this fallback with totals.cups_total at runtime.

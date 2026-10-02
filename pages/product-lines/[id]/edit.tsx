@@ -1,136 +1,60 @@
-import type { GetServerSideProps } from "next";
+import dynamic from "next/dynamic";
+import { useRouter } from "next/router";
+import { useEffect } from "react";
+import type { NewProductLinePageProps } from "../../../components/portal/product-lines/NewProductLinePage";
 import {
-  NewProductLinePage,
-  type NewProductLinePageProps,
-} from "../../../components/portal/product-lines";
-import { requirePortalSession } from "../../../lib/portal/auth";
-import { requestWithSplashOwnershipFallback } from "../../../lib/portal/splashOwnership";
-import { requestStrapiRestAsService } from "../../../services/server/strapiClient";
-import type {
-  PortalProductLine,
-  PortalSplash,
-} from "../../../types/portal";
+  PortalPageFailure,
+  PortalPageLoading,
+  PortalPageContent,
+} from "../../../components/portal/PortalPageState";
+import { usePortalPage } from "../../../lib/portal/usePortalPage";
 
-export default NewProductLinePage;
+const NewProductLinePage = dynamic<NewProductLinePageProps>(
+  () =>
+    // @ts-expect-error -- Next resolves the extensionless TSX source import.
+    import("../../../components/portal/product-lines/NewProductLinePage").then(
+      (module) => module.NewProductLinePage,
+    ),
+  {
+    ssr: false,
+    loading: () => <PortalPageLoading label="Edit product line" />,
+  },
+);
 
-const asId = (value: string | string[] | undefined) => {
-  const id = Array.isArray(value) ? value[0] : value;
-  return id && /^\d+$/.test(id) ? id : "";
-};
+const first = (value: string | string[] | undefined) =>
+  Array.isArray(value) ? value[0] || "" : value || "";
 
-export const getServerSideProps: GetServerSideProps<NewProductLinePageProps> = async (
-  context,
-) => {
-  const result = await requirePortalSession(context);
-  if ("redirect" in result) return { redirect: result.redirect };
+export default function EditProductLineRoute() {
+  const router = useRouter();
+  useEffect(() => {
+    // @ts-expect-error -- Next resolves the extensionless TSX source import.
+    void import("../../../components/portal/product-lines/NewProductLinePage");
+  }, []);
+  const productLineId = first(router.query.id);
+  const validRoute = /^\d+$/.test(productLineId);
+  const key =
+    router.isReady && validRoute
+      ? `/api/portal/product-lines/${encodeURIComponent(productLineId)}/editor`
+      : null;
+  const { data, error, mutate } = usePortalPage<NewProductLinePageProps>(key);
 
-  const productLineId = asId(context.params?.id);
-  if (!productLineId) return { notFound: true };
-
-  const ownParams = new URLSearchParams();
-  ownParams.set("filters[id][$eq]", productLineId);
-  if (result.session.client.id) {
-    ownParams.set(
-      "filters[author][client][id][$eq]",
-      String(result.session.client.id),
+  useEffect(() => {
+    if (router.isReady && !validRoute) void router.replace("/product-lines");
+  }, [router, validRoute]);
+  if (error) {
+    return (
+      <PortalPageFailure
+        label="Edit product line"
+        error={error}
+        retry={() => void mutate()}
+      />
     );
-  } else {
-    ownParams.set("filters[author][id][$eq]", String(result.session.user.id));
   }
-  ownParams.set("populate[base_product_line][fields][0]", "name");
-  ownParams.set("fields[0]", "name");
-  ownParams.set("fields[1]", "is_template");
-  ownParams.set("populate[can_be_added_to][fields][0]", "name");
-  ownParams.set(
-    "populate[base_product_line][populate][can_be_added_to][fields][0]",
-    "name",
+  if (!data) return <PortalPageLoading label="Edit product line" />;
+
+  return (
+    <PortalPageContent session={data.session}>
+      <NewProductLinePage key={productLineId} {...data} />
+    </PortalPageContent>
   );
-  ownParams.set("populate[cups][populate][image]", "*");
-  ownParams.set("populate[cups][populate][default_splash][populate][images]", "*");
-  ownParams.set("populate[custom_splash]", "*");
-  ownParams.set("pagination[pageSize]", "2000");
-
-  const rootParams = new URLSearchParams();
-  rootParams.set("filters[author][username][$eq]", "root");
-  rootParams.set("fields[0]", "name");
-  rootParams.set("fields[1]", "isPopular");
-  rootParams.set("fields[2]", "is_template");
-  rootParams.set("populate[can_be_added_to][fields][0]", "name");
-  rootParams.set("populate[cups][populate][image]", "*");
-  rootParams.set("populate[cups][populate][default_splash][populate][images]", "*");
-  rootParams.set("populate[custom_splash]", "*");
-  rootParams.set("sort[0]", "isPopular:DESC");
-  rootParams.set("sort[1]", "name:ASC");
-  rootParams.set("pagination[pageSize]", "2000");
-
-  const splashParams = new URLSearchParams();
-  splashParams.set("filters[$or][0][author][username][$eq]", "root");
-  splashParams.set(
-    "filters[$or][1][author][id][$eq]",
-    String(result.session.user.id),
-  );
-  splashParams.set("fields[0]", "name");
-  splashParams.set("fields[1]", "color");
-  splashParams.set("fields[2]", "isEmpty");
-  splashParams.set("sort[0]", "name:ASC");
-  splashParams.set("pagination[pageSize]", "2000");
-  const loadSplashes = (params: URLSearchParams) =>
-    requestStrapiRestAsService<PortalSplash[]>(
-      `/api/splashes?${params.toString()}`,
-    );
-
-  const templateParams = new URLSearchParams();
-  templateParams.set("filters[is_template][$eq]", "true");
-  templateParams.set("fields[0]", "name");
-  templateParams.set("fields[1]", "is_template");
-  templateParams.set("populate[can_be_added_to][fields][0]", "name");
-  templateParams.set("sort[0]", "name:ASC");
-  templateParams.set("pagination[pageSize]", "2000");
-
-  try {
-    const [ownProductLines, rootProductLines, templateProductLines, splashes] =
-      await Promise.all([
-        requestStrapiRestAsService<PortalProductLine[]>(
-          `/api/product-lines?${ownParams.toString()}`,
-        ),
-        requestStrapiRestAsService<PortalProductLine[]>(
-          `/api/product-lines?${rootParams.toString()}`,
-        ),
-        result.session.access === "product"
-          ? requestStrapiRestAsService<PortalProductLine[]>(
-              `/api/product-lines?${templateParams.toString()}`,
-            )
-          : Promise.resolve([]),
-        requestWithSplashOwnershipFallback(
-          splashParams,
-          loadSplashes,
-          () =>
-            console.warn(
-              "[product-lines/edit] splash ownership filtering is unsupported; using the compatible query.",
-            ),
-        ),
-      ]);
-
-    if (!ownProductLines[0]) return { notFound: true };
-
-    return {
-      props: {
-        session: result.session,
-        productLine: ownProductLines[0],
-        rootProductLines,
-        templateProductLines,
-        splashes,
-      },
-    };
-  } catch (error) {
-    console.error("[product-lines/edit] option loading failed:", error);
-    return {
-      props: {
-        session: result.session,
-        rootProductLines: [],
-        splashes: [],
-        loadError: "Product line options could not be loaded.",
-      },
-    };
-  }
-};
+}

@@ -47,7 +47,7 @@ async function handler(req: NextApiRequest, res: NextApiResponse) {
 
   if (req.method === "POST") {
     // The kiosk uppercases whatever the customer types or scans before it checks the
-    // code with the telemetry backend, and that backend matches exactly — a code stored
+    // code with the machine backend, and that backend matches exactly — a code stored
     // in any other case could never be redeemed.
     const code = asString(req.body?.code).toUpperCase();
     const discountType = asString(req.body?.discountType) as "PERCENT" | "FIXED";

@@ -208,7 +208,6 @@ export type Client = {
   portal_email?: string | null;
   portal_access_enabled?: boolean;
   portal_auth_provider?: "local" | "google" | "apple" | "facebook";
-  telemetry_organization_id?: number | null;
   country?: string;
   state?: string;
   city?: string;

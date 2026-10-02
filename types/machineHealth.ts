@@ -1,4 +1,4 @@
-export type HealthSource = "own" | "ops" | "telemetry" | "none";
+export type HealthSource = "own" | "ops" | "none";
 
 export type HealthState = "ok" | "warning" | "low" | "error" | "unknown";
 
@@ -22,9 +22,4 @@ export type MachineHealthRow = {
   waterType?: "bottle" | "mains" | null;
   waterAmountLiters?: number | null;
   cupsAmount?: number | null;
-};
-
-export type TelemetryHealthInput = {
-  status?: any | null;
-  storage?: any | null;
 };
