@@ -50,10 +50,16 @@ export function PortalPageFailure({
   label,
   error,
   retry,
+  notFoundLabel = "Product line not found",
+  backHref = "/product-lines",
+  backLabel = "Back to product lines",
 }: {
   label: string;
   error: PortalPageError;
   retry: () => void;
+  notFoundLabel?: string;
+  backHref?: string;
+  backLabel?: string;
 }) {
   if (error.status === 401) return <PortalPageLoading label={label} />;
   const notFound = error.status === 404;
@@ -65,7 +71,7 @@ export function PortalPageFailure({
         <Container maxW="xl" py={{ base: "20", md: "28" }}>
           <VStack align="stretch" spacing="5">
             <Heading as="h1" fontSize="3xl">
-              {notFound ? "Product line not found" : `${label} unavailable`}
+              {notFound ? notFoundLabel : `${label} unavailable`}
             </Heading>
             <Text color="bg.300">{error.message}</Text>
             <HStack>
@@ -74,8 +80,8 @@ export function PortalPageFailure({
                   Try again
                 </Button>
               ) : null}
-              <Button as={Link} href="/product-lines" variant="outline">
-                Back to product lines
+              <Button as={Link} href={backHref} variant="outline">
+                {backLabel}
               </Button>
             </HStack>
           </VStack>

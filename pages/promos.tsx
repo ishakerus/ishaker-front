@@ -1,4 +1,5 @@
 import {
+  Badge,
   Box,
   Button,
   ButtonGroup,
@@ -20,15 +21,17 @@ import {
   IconButton,
   Tooltip,
 } from "@chakra-ui/react";
-import type { GetServerSideProps } from "next";
-import { useRouter } from "next/router";
 import { FormEvent, useEffect, useState } from "react";
 import { FiTrash2 } from "react-icons/fi";
 import { MdQrCode2 } from "react-icons/md";
 import { PortalShell } from "../components/portal/PortalShell";
+import {
+  PortalPageContent,
+  PortalPageFailure,
+  PortalPageLoading,
+} from "../components/portal/PortalPageState";
 import { PromoQrModal } from "../components/portal/promos/PromoQrModal";
-import { requirePortalSession } from "../lib/portal/auth";
-import { requestStrapiRestAsService } from "../services/server/strapiClient";
+import { usePortalPage } from "../lib/portal/usePortalPage";
 import type { PortalSession, PromoCode } from "../types/portal";
 import { formatMoney, getCurrencySymbol } from "../lib/portal/currency";
 import { hasPromoCodeScopeConflict } from "../lib/portal/promoScope";
@@ -49,6 +52,32 @@ const INVALID_QR_CODE_MESSAGE =
   "Use only letters, digits, - or _, up to 32 characters.";
 const UNSAFE_QR_CODE_TOOLTIP =
   "This code has characters the machine scanner can't read — create a new code with letters, digits, - or _.";
+
+type PromoDisplayStatus = "active" | "scheduled" | "expired" | "revoked";
+
+const PROMO_STATUS_STYLE: Record<
+  PromoDisplayStatus,
+  { label: string; colorScheme: string }
+> = {
+  active: { label: "Active", colorScheme: "green" },
+  scheduled: { label: "Scheduled", colorScheme: "blue" },
+  expired: { label: "Expired", colorScheme: "orange" },
+  revoked: { label: "Revoked", colorScheme: "red" },
+};
+
+const getPromoDisplayStatus = (
+  promo: PromoCode,
+  now: number,
+): PromoDisplayStatus => {
+  if (promo.status === "cancelled") return "revoked";
+  if (promo.status === "expired" || isPromoExpired(promo.end_at, now)) {
+    return "expired";
+  }
+
+  const startsAt = new Date(promo.start_at).getTime();
+  if (Number.isFinite(startsAt) && startsAt > now) return "scheduled";
+  return "active";
+};
 
 const START_SHORTCUTS: Array<{ label: string; value: PromoStartShortcut }> = [
   { label: "now", value: "now" },
@@ -119,14 +148,14 @@ type PromosPageProps = {
   loadError?: string;
 };
 
-export default function PromosPage({
+function PromosPage({
   session,
   promos,
   serverNow,
   loadError,
-}: PromosPageProps) {
+  onRefresh,
+}: PromosPageProps & { onRefresh: () => Promise<unknown> }) {
   const { showConfirm } = useCustomDialog();
-  const router = useRouter();
   const [title, setTitle] = useState("");
   const [code, setCode] = useState("");
   const [machineId, setMachineId] = useState("");
@@ -195,7 +224,7 @@ export default function PromosPage({
       if (!response.ok) {
         throw new Error(payload?.message || "Promo code could not be deleted.");
       }
-      await router.replace(router.asPath);
+      await onRefresh();
     } catch (deleteFailure) {
       setDeleteError(
         deleteFailure instanceof Error
@@ -258,7 +287,7 @@ export default function PromosPage({
       return;
     }
 
-    router.replace(router.asPath);
+    void onRefresh();
   };
 
   return (
@@ -284,195 +313,235 @@ export default function PromosPage({
             {deleteError ? <Text color="red.300">{deleteError}</Text> : null}
             {promos.length ? (
               <VStack
-                spacing="4"
+                spacing="3"
                 align="stretch"
                 maxH="1000px"
                 overflowY="auto"
                 pr={{ base: "0", md: "2" }}
               >
-                {promos.map((promo) => (
-                  <Box3D
-                    variant="no_contrast"
-                    bg={
-                      promo.status === "cancelled"
-                        ? "blackAlpha.200"
-                        : undefined
-                    }
-                    p={{ base: "3", sm: "4" }}
-                    minW="0"
-                    key={promo.id}
-                  >
-                    <HStack
-                      justify="space-between"
-                      align="flex-start"
-                      spacing="3"
-                      mb="3"
+                {promos.map((promo) => {
+                  const displayStatus = getPromoDisplayStatus(
+                    promo,
+                    currentTime,
+                  );
+                  const statusStyle = PROMO_STATUS_STYLE[displayStatus];
+                  const canShowQr =
+                    isQrSafePromoCode(promo.code) &&
+                    displayStatus !== "expired" &&
+                    displayStatus !== "revoked";
+                  const qrTooltip = !isQrSafePromoCode(promo.code)
+                    ? UNSAFE_QR_CODE_TOOLTIP
+                    : canShowQr
+                      ? `Show QR code for ${promo.code}`
+                      : "QR codes are unavailable for expired or revoked promos.";
+                  const countdown =
+                    displayStatus === "revoked"
+                      ? null
+                      : formatPromoCountdown(
+                          promo.start_at,
+                          promo.end_at,
+                          currentTime,
+                        );
+
+                  return (
+                    <Box3D
+                      variant="no_contrast"
+                      bg={
+                        displayStatus === "revoked"
+                          ? "blackAlpha.200"
+                          : undefined
+                      }
+                      p={{ base: "4", sm: "5" }}
+                      minW="0"
+                      key={promo.id}
                     >
-                      <Text
-                        color="bg.50"
-                        fontWeight="800"
-                        fontSize={{ base: "lg", sm: "2xl" }}
-                        lineHeight="short"
-                        overflowWrap="anywhere"
-                        minW="0"
-                      >
-                        {promo.title || "Untitled promo"}
-                      </Text>
-                      <HStack flexShrink="0" spacing="2">
-                        {promo.status === "cancelled" ? (
+                      <VStack align="stretch" spacing={{ base: "3", sm: "4" }}>
+                        <HStack
+                          justify="space-between"
+                          align="center"
+                          spacing="3"
+                        >
                           <Text
-                            color="red.300"
-                            fontSize="md"
-                            fontWeight="700"
+                            color="bg.50"
+                            fontWeight="800"
+                            fontSize={{ base: "xl", sm: "2xl" }}
+                            lineHeight="short"
+                            overflowWrap="anywhere"
+                            minW="0"
                           >
-                            Revoked
+                            {promo.title || "Untitled promo"}
                           </Text>
-                        ) : promo.status === "expired" ||
-                          isPromoExpired(promo.end_at, currentTime) ? (
-                          <Text
-                            color="orange.300"
-                            fontSize="md"
-                            fontWeight="700"
+                          <HStack flexShrink="0" spacing="2">
+                            <Badge
+                              colorScheme={statusStyle.colorScheme}
+                              variant="subtle"
+                              borderRadius="full"
+                              px="2.5"
+                              py="1"
+                              fontSize="xs"
+                              lineHeight="short"
+                              textTransform="none"
+                            >
+                              {statusStyle.label}
+                            </Badge>
+                            <IconButton
+                              size="xs"
+                              aria-label={`Delete promo code ${promo.code}`}
+                              minH="8"
+                              minW="8"
+                              colorScheme="red"
+                              variant="outline"
+                              isLoading={deletingId === String(promo.id)}
+                              isDisabled={Boolean(deletingId)}
+                              onClick={() => void deletePromo(promo)}
+                            >
+                              <FiTrash2 size="1.2rem" />
+                            </IconButton>
+                          </HStack>
+                        </HStack>
+
+                        <Grid
+                          gridTemplateColumns={{
+                            base: "minmax(0, 1fr)",
+                            sm: "minmax(0, 1fr) auto",
+                          }}
+                          gap={{ base: "3", sm: "4" }}
+                          alignItems="end"
+                        >
+                          <VStack minW="0" align="stretch" spacing="1">
+                            {countdown ? (
+                              <Text color="bg.200" fontWeight="700">
+                                {countdown}
+                              </Text>
+                            ) : null}
+                            <Text color="bg.300">
+                              {promo.discount_type === "PERCENT"
+                                ? `${promo.amount}% off • ${promo.used_count ?? 0} of ${promo.qty ?? "\u221e"} used`
+                                : `${formatMoney(
+                                    promo.amount,
+                                    promo.machine?.currency ||
+                                      session.client.currency ||
+                                      session.machines[0]?.currency,
+                                  )} off • ${promo.used_count ?? 0} of ${promo.qty ?? "\u221e"} used`}
+                            </Text>
+                            <Text color="bg.400" fontSize="sm">
+                              {promo.machine
+                                ? promo.machine.title ||
+                                  promo.machine.serial_number ||
+                                  `Machine #${promo.machine.id}`
+                                : "All machines"}
+                            </Text>
+                            <Text
+                              color="bg.400"
+                              fontSize="xs"
+                              lineHeight="short"
+                              overflowWrap="anywhere"
+                              pt="1"
+                            >
+                              {formatPromoDate(promo.start_at, useLocalDates)}{" "}
+                              to {formatPromoDate(promo.end_at, useLocalDates)}
+                            </Text>
+                          </VStack>
+                          <HStack
+                            align="stretch"
+                            spacing="2"
+                            minW={{ base: "0", sm: "170px" }}
+                            w={{ base: "full", sm: "auto" }}
                           >
-                            Expired
+                            <Tooltip
+                              label={qrTooltip}
+                              hasArrow
+                              isDisabled={canShowQr}
+                            >
+                              <Box as="span">
+                                <IconButton
+                                  aria-label={`Show QR code for ${promo.code}`}
+                                  icon={<MdQrCode2 size="1.35rem" />}
+                                  h="100%"
+                                  minH="10"
+                                  minW="12"
+                                  borderRadius="lg"
+                                  variant="outline"
+                                  isDisabled={!canShowQr}
+                                  onClick={() => setQrPromo(promo)}
+                                />
+                              </Box>
+                            </Tooltip>
+                            <Tooltip label={qrTooltip} hasArrow>
+                              <Box as="span" flex="1" minW="0">
+                                <Box3D
+                                  as="button"
+                                  type="button"
+                                  aria-label={`Show QR code for ${promo.code}`}
+                                  disabled={!canShowQr}
+                                  variant={
+                                    canShowQr ? "primary" : "no_contrast"
+                                  }
+                                  px="3"
+                                  py="2.5"
+                                  w="full"
+                                  h="full"
+                                  minH="11"
+                                  minW="0"
+                                  boxShadow="lg"
+                                  borderRadius="lg"
+                                  cursor={canShowQr ? "pointer" : "not-allowed"}
+                                  transition="transform 140ms ease, filter 140ms ease"
+                                  _hover={
+                                    canShowQr
+                                      ? {
+                                          transform: "translateY(-1px)",
+                                          filter: "brightness(1.05)",
+                                        }
+                                      : undefined
+                                  }
+                                  _active={
+                                    canShowQr
+                                      ? { transform: "translateY(0)" }
+                                      : undefined
+                                  }
+                                  _focusVisible={{
+                                    outline: "2px solid",
+                                    outlineColor: "acid.200",
+                                    outlineOffset: "2px",
+                                  }}
+                                  onClick={() => setQrPromo(promo)}
+                                >
+                                  <Text
+                                    as="span"
+                                    display="block"
+                                    color={canShowQr ? "bg.900" : "bg.300"}
+                                    fontWeight="bold"
+                                    textAlign="center"
+                                    fontSize="lg"
+                                    overflowWrap="anywhere"
+                                  >
+                                    {promo.code}
+                                  </Text>
+                                </Box3D>
+                              </Box>
+                            </Tooltip>
+                          </HStack>
+                        </Grid>
+
+                        {promo.notes?.trim() ? (
+                          <Text
+                            color="bg.300"
+                            pt="3"
+                            borderTop="1px solid"
+                            borderColor="whiteAlpha.100"
+                            whiteSpace="pre-wrap"
+                          >
+                            <Text as="span" color="bg.200" fontWeight="700">
+                              Notes:{" "}
+                            </Text>
+                            {promo.notes}
                           </Text>
                         ) : null}
-                        <IconButton
-                          size="xs"
-                          aria-label={`Delete promo code ${promo.code}`}
-                          minH="8"
-                          minW="8"
-                          colorScheme="red"
-                          variant="outline"
-                          isLoading={deletingId === String(promo.id)}
-                          isDisabled={Boolean(deletingId)}
-                          onClick={() => void deletePromo(promo)}
-                        >
-                          <FiTrash2 size="1.2rem" />
-                        </IconButton>
-                      </HStack>
-                    </HStack>
-
-                    <Grid
-                      gridTemplateColumns={{
-                        base: "minmax(0, 1fr)",
-                        sm: "minmax(0, 1fr) auto",
-                      }}
-                      gap={{ base: "3", sm: "4" }}
-                      alignItems="start"
-                    >
-                      <Box minW="0">
-                        <Text color="bg.200" fontWeight="700">
-                          {promo.status === "cancelled"
-                            ? ""
-                            : formatPromoCountdown(
-                                promo.start_at,
-                                promo.end_at,
-                                currentTime,
-                              ) || ""}
-                        </Text>
-                        <Text color="bg.300">
-                          {promo.discount_type === "PERCENT"
-                            ? `${promo.amount}% off • ${promo.used_count ?? 0} of ${promo.qty ?? "\u221e"} used`
-                            : `${formatMoney(
-                                promo.amount,
-                                promo.machine?.currency ||
-                                  session.client.currency ||
-                                  session.machines[0]?.currency,
-                            )} off • ${promo.used_count ?? 0} of ${promo.qty ?? "\u221e"} used`}
-                        </Text>
-                        <Text color="bg.400" fontSize="sm">
-                          {promo.machine
-                            ? promo.machine.title ||
-                              promo.machine.serial_number ||
-                              `Machine #${promo.machine.id}`
-                            : "All machines"}
-                        </Text>
-                      </Box>
-                      <Box
-                        minW={{ base: "0", sm: "100px" }}
-                        w={{ base: "full", sm: "auto" }}
-                      >
-                        <HStack align="stretch" spacing="2" mb="2">
-                          <Box3D
-                            variant={
-                              promo.status === "cancelled" ||
-                              promo.status === "expired" ||
-                              isPromoExpired(promo.end_at, currentTime)
-                                ? "no_contrast"
-                                : "primary"
-                            }
-                            p="2"
-                            flex="1"
-                            minW="0"
-                            boxShadow="lg"
-                            borderRadius="md"
-                          >
-                            <Text
-                              color="bg.900"
-                              fontWeight="bold"
-                              align="center"
-                              fontSize="lg"
-                              overflowWrap="anywhere"
-                            >
-                              {promo.code}
-                            </Text>
-                          </Box3D>
-                          <Tooltip
-                            label={
-                              !isQrSafePromoCode(promo.code)
-                                ? UNSAFE_QR_CODE_TOOLTIP
-                                : "QR codes are unavailable for expired or revoked promos."
-                            }
-                            hasArrow
-                            isDisabled={
-                              isQrSafePromoCode(promo.code) &&
-                              promo.status !== "cancelled" &&
-                              promo.status !== "expired" &&
-                              !isPromoExpired(promo.end_at, currentTime)
-                            }
-                          >
-                            <Box as="span">
-                              <IconButton
-                                aria-label={`Show QR code for ${promo.code}`}
-                                icon={<MdQrCode2 size="1.35rem" />}
-                                h="100%"
-                                minH="10"
-                                variant="outline"
-                                isDisabled={
-                                  !isQrSafePromoCode(promo.code) ||
-                                  promo.status === "cancelled" ||
-                                  promo.status === "expired" ||
-                                  isPromoExpired(promo.end_at, currentTime)
-                                }
-                                onClick={() => setQrPromo(promo)}
-                              />
-                            </Box>
-                          </Tooltip>
-                        </HStack>
-                      </Box>
-                    </Grid>
-
-                    <Text
-                      color="bg.400"
-                      fontSize="xs"
-                      lineHeight="short"
-                      overflowWrap="anywhere"
-                    >
-                      {formatPromoDate(promo.start_at, useLocalDates)} to{" "}
-                      {formatPromoDate(promo.end_at, useLocalDates)}
-                    </Text>
-
-                    {promo.notes?.trim() ? (
-                      <Text color="bg.300" mt="2" whiteSpace="pre-wrap">
-                        <Text as="span" color="bg.200" fontWeight="700">
-                          Notes:{" "}
-                        </Text>
-                        {promo.notes}
-                      </Text>
-                    ) : null}
-                  </Box3D>
-                ))}
+                      </VStack>
+                    </Box3D>
+                  );
+                })}
               </VStack>
             ) : (
               <Text color="bg.300">No promo codes yet.</Text>
@@ -685,41 +754,29 @@ export default function PromosPage({
   );
 }
 
-export const getServerSideProps: GetServerSideProps<PromosPageProps> = async (
-  context,
-) => {
-  const result = await requirePortalSession(context);
-  if ("redirect" in result) return { redirect: result.redirect };
-  const serverNow = Date.now();
+export default function PromosRoute() {
+  const { data, error, mutate } = usePortalPage<PromosPageProps>(
+    "/api/portal/promos/bootstrap",
+    { refreshInterval: 120_000 },
+  );
 
-  try {
-    const params = new URLSearchParams();
-    params.set("filters[client][id][$eq]", String(result.session.client.id));
-    params.set("sort[0]", "start_at:desc");
-    params.set("pagination[pageSize]", "2000");
-    params.set("populate[machine][populate][currency]", "*");
-    const promos = await requestStrapiRestAsService<PromoCode[]>(
-      `/api/promo-codes?${params.toString()}`,
+  if (error) {
+    return (
+      <PortalPageFailure
+        label="Promos"
+        error={error}
+        retry={() => void mutate()}
+        notFoundLabel="Promos not found"
+        backHref="/machines"
+        backLabel="Back to machines"
+      />
     );
-
-    return {
-      props: {
-        session: result.session,
-        promos,
-        serverNow,
-      },
-    };
-  } catch (error) {
-    console.error("[promos] load failed:", error);
-
-    return {
-      props: {
-        session: result.session,
-        promos: [],
-        serverNow,
-        loadError:
-          "Add the promo-code content type in Strapi to persist and list client promo codes.",
-      },
-    };
   }
-};
+  if (!data) return <PortalPageLoading label="Promos" />;
+
+  return (
+    <PortalPageContent session={data.session}>
+      <PromosPage {...data} onRefresh={() => mutate()} />
+    </PortalPageContent>
+  );
+}

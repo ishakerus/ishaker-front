@@ -10,8 +10,12 @@ import {
   Text,
   Tr,
 } from "@chakra-ui/react";
-import type { GetServerSideProps } from "next";
 import { useRouter } from "next/router";
+import {
+  PortalPageContent,
+  PortalPageFailure,
+  PortalPageLoading,
+} from "../../components/portal/PortalPageState";
 import { MachineRegistrationEditor } from "../../components/portal/machines/MachineRegistrationEditor";
 import { MachineDoorUnlock } from "../../components/portal/machines/MachineDoorUnlock";
 import { MachineHealthStrip } from "../../components/portal/machines/MachineHealthStrip";
@@ -21,9 +25,7 @@ import { MachineProductLineGrouping } from "../../components/portal/machines/Mac
 import { MachineFreeMode } from "../../components/machines/MachineFreeMode";
 import { NayaxSettingsSection } from "../../components/portal/NayaxSettingsSection";
 import { PortalShell } from "../../components/portal/PortalShell";
-import { requirePortalSession } from "../../lib/portal/auth";
-import { getMachineCells } from "../../services/server/machineCells";
-import { requestStrapiRestAsService } from "../../services/server/strapiClient";
+import { usePortalPage } from "../../lib/portal/usePortalPage";
 import type { PortalMachineCell, PortalSession } from "../../types/portal";
 import type { Currency, Language, Machine } from "../../types/strapi";
 import {
@@ -91,14 +93,14 @@ const rows = (machine: Machine) => [
   ["Bootstrap version", displayValue(machine.bootstrap_version)],
 ];
 
-export default function MachineDetailPage({
+function MachineDetailPage({
   session,
   machine,
   cells,
   currencies,
   languages,
-}: MachineDetailPageProps) {
-  const router = useRouter();
+  onRefresh,
+}: MachineDetailPageProps & { onRefresh: () => void }) {
   const baseHealth = buildMachineHealthRow(machine);
   const health = cells
     ? applyStoredPowderLevels(baseHealth, machine, cells)
@@ -121,7 +123,7 @@ export default function MachineDetailPage({
               machine={machine}
               health={health}
               initialCells={cells || undefined}
-              onHealthChanged={() => void router.replace(router.asPath)}
+              onHealthChanged={onRefresh}
             />
           </Box>
           <MachineDoorUnlock machine={machine} />
@@ -134,6 +136,7 @@ export default function MachineDetailPage({
               state: session.client.state,
               city: session.client.city,
             }}
+            onSaved={onRefresh}
           />
         </Box>
         <Box gridColumn={{ xl: "1 / -1" }}>
@@ -217,51 +220,41 @@ export default function MachineDetailPage({
   );
 }
 
-export const getServerSideProps: GetServerSideProps<
-  MachineDetailPageProps
-> = async (context) => {
-  const result = await requirePortalSession(context);
-  if ("redirect" in result) return { redirect: result.redirect };
+const first = (value: string | string[] | undefined) =>
+  Array.isArray(value) ? value[0] || "" : value || "";
 
-  const machineId = Array.isArray(context.params?.id)
-    ? context.params?.id[0]
-    : context.params?.id;
-  const machine = result.session.machines.find(
-    (item) => String(item.id) === String(machineId),
+export default function MachineDetailRoute() {
+  const router = useRouter();
+  const machineId = first(router.query.id);
+  const { data, error, mutate } = usePortalPage<MachineDetailPageProps>(
+    router.isReady && machineId
+      ? `/api/portal/machines/${encodeURIComponent(machineId)}/bootstrap`
+      : null,
+    { refreshInterval: 120_000 },
   );
 
-  if (!machine) {
-    return { notFound: true };
+  if (error) {
+    return (
+      <PortalPageFailure
+        label="Machine details"
+        error={error}
+        retry={() => void mutate()}
+        notFoundLabel="Machine not found"
+        backHref="/machines"
+        backLabel="Back to machines"
+      />
+    );
+  }
+  if (!data || String(data.machine.id) !== String(machineId)) {
+    return <PortalPageLoading label="Machine details" />;
   }
 
-  let currencies: Currency[] = [];
-  let languages: Language[] = [];
-  let cells: PortalMachineCell[] | null = null;
-  try {
-    [currencies, languages] = await Promise.all([
-      requestStrapiRestAsService<Currency[]>(
-        "/api/currencies?filters[isActive][$eq]=true&sort[0]=code:ASC&pagination[pageSize]=2000",
-      ),
-      requestStrapiRestAsService<Language[]>(
-        "/api/languages?filters[isActive][$eq]=true&sort[0]=name:ASC&pagination[pageSize]=2000",
-      ),
-    ]);
-  } catch (error) {
-    console.error("[machines/detail] currency loading failed:", error);
-  }
-  try {
-    cells = await getMachineCells(machine.id);
-  } catch (error) {
-    console.error("[machines/detail] container loading failed:", error);
-  }
-
-  return {
-    props: {
-      session: result.session,
-      machine,
-      cells,
-      currencies,
-      languages,
-    },
-  };
-};
+  return (
+    <PortalPageContent session={data.session}>
+      <MachineDetailPage
+        {...data}
+        onRefresh={() => void mutate()}
+      />
+    </PortalPageContent>
+  );
+}

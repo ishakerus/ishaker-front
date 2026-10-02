@@ -52,11 +52,17 @@ export const usePortalPage = <T,>(
   });
 
   useEffect(() => {
-    if (result.error?.status !== 401) return;
+    const errorCode = result.error?.payload?.error;
     const destination =
-      result.error.payload?.error === "support_session_expired"
-        ? "/admin/dashboard"
-        : "/login";
+      result.error?.status === 401
+        ? errorCode === "support_session_expired"
+          ? "/admin/dashboard"
+          : "/login"
+        : result.error?.status === 403 &&
+            errorCode === "product_access_required"
+          ? "/product-lines"
+          : null;
+    if (!destination) return;
     void router.replace(destination);
   }, [result.error, router]);
 

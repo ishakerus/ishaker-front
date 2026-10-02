@@ -12,7 +12,6 @@ import {
   VStack,
   useToast,
 } from "@chakra-ui/react";
-import { useRouter } from "next/router";
 import { FormEvent, useState } from "react";
 import { FiSave } from "react-icons/fi";
 import type { Machine } from "../../../types/strapi";
@@ -24,13 +23,14 @@ type MachineRegistrationEditorProps = {
     state?: string;
     city?: string;
   };
+  onSaved?: () => void;
 };
 
 export function MachineRegistrationEditor({
   machine,
   defaults,
+  onSaved = () => undefined,
 }: MachineRegistrationEditorProps) {
-  const router = useRouter();
   const toast = useToast();
   const [country, setCountry] = useState(machine.country || defaults.country || "USA");
   const [state, setState] = useState(machine.state_region || defaults.state || "");
@@ -65,7 +65,7 @@ export function MachineRegistrationEditor({
     }
 
     toast({ title: "Machine data saved", status: "success" });
-    await router.replace(router.asPath);
+    onSaved();
   };
 
   return (

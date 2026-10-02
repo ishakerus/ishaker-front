@@ -12,18 +12,21 @@ import {
   IconButton,
 } from "@chakra-ui/react";
 import Link from "next/link";
-import type { GetServerSideProps } from "next";
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { PortalShell } from "../../components/portal/PortalShell";
+import {
+  PortalPageContent,
+  PortalPageFailure,
+  PortalPageLoading,
+} from "../../components/portal/PortalPageState";
 import { MachineHealthStrip } from "../../components/portal/machines/MachineHealthStrip";
-import { requirePortalSession } from "../../lib/portal/auth";
 import { getSmallestMediaUrl } from "../../lib/portal/media";
+import { usePortalPage } from "../../lib/portal/usePortalPage";
 import type {
   PortalMachineCell,
-  PortalMachineSummary,
   PortalSession,
 } from "../../types/portal";
-import type { Machine, SalesSummary } from "../../types/strapi";
+import type { SalesSummary } from "../../types/strapi";
 import type { MachineHealthRow } from "../../types/machineHealth";
 import { FaPlus } from "react-icons/fa";
 import { Box3D } from "../../styles/theme/custom";
@@ -31,40 +34,14 @@ import { ImInfo } from "react-icons/im";
 import { SupportContactBox } from "../../components/shared/SupportContactBox";
 type MachinesPageProps = {
   session: PortalSession;
-  machines: PortalMachineSummary[];
 };
 
 type MachineHealthWithCells = MachineHealthRow & {
   cells?: PortalMachineCell[];
 };
 
-const displayValue = (value: unknown, fallback = "Registered") => {
-  if (value === null || typeof value === "undefined" || value === "")
-    return fallback;
-  if (
-    typeof value === "string" ||
-    typeof value === "number" ||
-    typeof value === "boolean"
-  ) {
-    return String(value);
-  }
-  if (typeof value === "object") {
-    const record = value as Record<string, unknown>;
-    const text = record.text || record.label || record.name || record.title;
-    if (text) return displayValue(text, fallback);
-  }
-
-  return fallback;
-};
-
-const deriveStatusLabel = (machine: Machine) => {
-  if (machine.status === "working") return "Working";
-  if (machine.status === "offline") return "Offline";
-  if (machine.status === "error") return "Error";
-  return displayValue(machine.status);
-};
-
-export default function MachinesPage({ session, machines }: MachinesPageProps) {
+function MachinesPage({ session }: MachinesPageProps) {
+  const machines = session.machines;
   const [healthRows, setHealthRows] = useState<MachineHealthWithCells[]>([]);
   const [isHealthLoading, setIsHealthLoading] = useState(true);
   const [salesToday, setSalesToday] = useState<Map<
@@ -124,6 +101,12 @@ export default function MachinesPage({ session, machines }: MachinesPageProps) {
   useEffect(() => {
     void loadHealth(true);
     void loadSalesToday();
+    const timer = window.setInterval(() => {
+      if (document.visibilityState !== "visible") return;
+      void loadHealth();
+      void loadSalesToday();
+    }, 60_000);
+    return () => window.clearInterval(timer);
   }, [loadHealth, loadSalesToday]);
 
   const healthByMachineId = useMemo(
@@ -290,27 +273,29 @@ export default function MachinesPage({ session, machines }: MachinesPageProps) {
   );
 }
 
-export const getServerSideProps: GetServerSideProps<MachinesPageProps> = async (
-  context,
-) => {
-  const result = await requirePortalSession(context);
-  if ("redirect" in result) return { redirect: result.redirect };
-  if (result.session.access === "product") {
-    return {
-      redirect: {
-        destination: "/product-lines",
-        permanent: false,
-      },
-    };
-  }
+export default function MachinesRoute() {
+  const { data, error, mutate } = usePortalPage<MachinesPageProps>(
+    "/api/portal/machines/bootstrap",
+    { refreshInterval: 120_000 },
+  );
 
-  return {
-    props: {
-      session: result.session,
-      machines: result.session.machines.map((machine) => ({
-        ...machine,
-        statusLabel: deriveStatusLabel(machine),
-      })),
-    },
-  };
-};
+  if (error) {
+    return (
+      <PortalPageFailure
+        label="Machines"
+        error={error}
+        retry={() => void mutate()}
+        notFoundLabel="Machines not found"
+        backHref="/"
+        backLabel="Back to home"
+      />
+    );
+  }
+  if (!data) return <PortalPageLoading label="Machines" />;
+
+  return (
+    <PortalPageContent session={data.session}>
+      <MachinesPage {...data} />
+    </PortalPageContent>
+  );
+}
