@@ -5,6 +5,9 @@ import {
   Divider,
   FormControl,
   FormLabel,
+  FormHelperText,
+  HStack,
+  Switch,
   Text,
   Textarea,
   VStack,
@@ -26,6 +29,11 @@ import {
   SearchableImageSelect,
   type SearchableImageOption,
 } from "../SearchableImageSelect";
+import { Help } from "../../../Help";
+import {
+  RelationMultiSelect,
+  type RelationMultiSelectOption,
+} from "../RelationMultiSelect";
 
 type NewProductFormProps = {
   brandId: string;
@@ -77,6 +85,13 @@ type NewProductFormProps = {
   cupOptions: SearchableImageOption[];
   defaultCup?: SearchableImageOption;
   onCupChange: (value: string) => void;
+  isDependent: boolean;
+  onIsDependentChange: (value: boolean) => void;
+  canBeAddedToIds: string[];
+  canBeAddedToOptions: RelationMultiSelectOption[];
+  onCanBeAddedToChange: (value: string[]) => void;
+  mixAllowlistEmpty: boolean;
+  mixPreview?: string[];
 };
 
 export function NewProductForm({
@@ -125,6 +140,13 @@ export function NewProductForm({
   cupOptions,
   defaultCup,
   onCupChange,
+  isDependent,
+  onIsDependentChange,
+  canBeAddedToIds,
+  canBeAddedToOptions,
+  onCanBeAddedToChange,
+  mixAllowlistEmpty,
+  mixPreview = [],
 }: NewProductFormProps) {
   return (
     <Box
@@ -247,6 +269,67 @@ export function NewProductForm({
 
         <Divider />
 
+        <FormControl>
+          <HStack justify="space-between" align="center">
+            <HStack spacing="1">
+              <FormLabel mb="0">Not a drink on its own (add-on only)</FormLabel>
+              <Help text="Shown on the kiosk only as an addition to other drinks, at its full dose." />
+            </HStack>
+            <Switch
+              aria-label="Not a drink on its own (add-on only)"
+              isChecked={isDependent}
+              onChange={(event) => onIsDependentChange(event.target.checked)}
+              colorScheme="green"
+            />
+          </HStack>
+        </FormControl>
+
+        <FormControl>
+          <FormLabel>Can be added to</FormLabel>
+          {mixAllowlistEmpty ? (
+            <Box
+              border="1px dashed"
+              borderColor="whiteAlpha.300"
+              borderRadius="lg"
+              px="4"
+              py="3"
+            >
+              <Text color="bg.300" fontSize="sm">
+                This product line can&apos;t be added to other drinks. Ask iShaker support.
+              </Text>
+            </Box>
+          ) : (
+            <RelationMultiSelect
+              ariaLabel="Select drinks this product can be added to"
+              emptyLabel="No eligible drinks are available yet."
+              options={canBeAddedToOptions}
+              value={canBeAddedToIds}
+              onChange={onCanBeAddedToChange}
+              placeholder="Select base drinks"
+            />
+          )}
+          <FormHelperText>
+            Only eligible drinks from your own library are shown.
+          </FormHelperText>
+          {mixPreview.length ? (
+            <Box mt="3" bg="whiteAlpha.50" borderRadius="lg" p="3">
+              <Text color="bg.200" fontSize="sm" fontWeight="700" mb="1">
+                Mix preview
+              </Text>
+              {mixPreview.map((line) => (
+                <Text key={line} color="bg.300" fontSize="sm">
+                  {line}
+                </Text>
+              ))}
+              <Text color="acid.300" fontSize="sm" mt="1">
+                Price: same as the base drink
+              </Text>
+            </Box>
+          ) : null}
+        </FormControl>
+
+        <Divider />
+
         <ProductComponentsTable
           components={components}
           dosage={dosage}
@@ -266,6 +349,7 @@ export function NewProductForm({
           priceCurrencyId={priceCurrencyId}
           isCurrencySaving={isCurrencySaving}
           onPriceCurrencyChange={onPriceCurrencyChange}
+          isDependent={isDependent}
         />
 
         {error ? (

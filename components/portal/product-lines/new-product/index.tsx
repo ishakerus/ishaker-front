@@ -196,6 +196,7 @@ export type NewProductPageProps = {
   editingProduct?: PortalProduct | null;
   productLine: PortalProductLine;
   templateProducts: PortalProduct[];
+  candidateProducts: PortalProduct[];
   session: PortalSession;
   splashes: PortalSplash[];
   tastes: PortalTaste[];
@@ -209,6 +210,7 @@ export function NewProductPage({
   editingProduct = null,
   productLine,
   templateProducts,
+  candidateProducts,
   session,
   splashes,
   tastes,
@@ -316,6 +318,12 @@ export function NewProductPage({
     initialProduct?.serving_unit === "ml" ? "ml" : "g",
   );
   const [isSubmitting, setIsSubmitting] = useState(false);
+  const [isDependent, setIsDependent] = useState(
+    initialProduct?.is_dependent === true,
+  );
+  const [canBeAddedToIds, setCanBeAddedToIds] = useState(
+    (initialProduct?.can_be_added_to || []).map((product) => String(product.id)),
+  );
   const [error, setError] = useState("");
   const hydratedProductDetailsId = useRef(
     initialProduct?.components !== undefined &&
@@ -452,6 +460,67 @@ export function NewProductPage({
     (taste) => String(taste.main?.id) === mainImageId,
   )?.main;
   const selectedBrand = brands.find((brand) => String(brand.id) === brandId);
+  const allowedLineIds = useMemo(
+    () =>
+      new Set(
+        (productLine.base_product_line?.can_be_added_to || []).map((line) =>
+          String(line.id),
+        ),
+      ),
+    [productLine.base_product_line?.can_be_added_to],
+  );
+  const eligibleCandidateProducts = useMemo(
+    () =>
+      candidateProducts.filter((candidate) => {
+        const candidateRootLineId =
+          candidate.product_line?.base_product_line?.id ||
+          candidate.product_line?.id;
+        return (
+          String(candidate.id) !== editingProductId &&
+          candidate.is_dependent !== true &&
+          Boolean(candidateRootLineId) &&
+          allowedLineIds.has(String(candidateRootLineId))
+        );
+      }),
+    [allowedLineIds, candidateProducts, editingProductId],
+  );
+  const canBeAddedToOptions = eligibleCandidateProducts.map((candidate) => {
+    const hasReversePair = (candidate.can_be_added_to || []).some(
+      (target) => String(target.id) === editingProductId,
+    );
+    return {
+      id: String(candidate.id),
+      label: capitalizeName(candidate.name),
+      ...(candidate.product_line?.name
+        ? { note: hasReversePair ? "already added to this one" : capitalizeName(candidate.product_line.name) }
+        : hasReversePair
+          ? { note: "already added to this one" }
+          : {}),
+      isDisabled: hasReversePair,
+    };
+  });
+  const mixPreview = canBeAddedToIds.flatMap((targetId) => {
+    const target = eligibleCandidateProducts.find(
+      (candidate) => String(candidate.id) === targetId,
+    );
+    if (!target) return [];
+    const baseGrams = Number(target.dosage?.product);
+    const addonGrams = Number(dosage.product);
+    if (!(baseGrams > 0)) return [];
+    if (isDependent) {
+      return [
+        `${capitalizeName(target.name)} ${baseGrams} g + ${capitalizeName(name || "Add-on")} ${
+          addonGrams > 0 ? addonGrams : "?"
+        } g`,
+      ];
+    }
+    const ratio = 40;
+    return [
+      `${capitalizeName(target.name)} ${(baseGrams * (1 - ratio / 100)).toFixed(1).replace(/\.0$/, "")} g + ${capitalizeName(
+        name || "Add-on",
+      )} ${(baseGrams * ratio / 100).toFixed(1).replace(/\.0$/, "")} g at ${ratio}% (available: 20–80% in 10% steps)`,
+    ];
+  });
 
   useEffect(() => {
     if (!splashDialog.isOpen || !allSplashOptions?.splashes) return;
@@ -513,7 +582,7 @@ export function NewProductPage({
     if (!(Number(dosage.drinkVolume) >= 50)) {
       return "Full drink volume must be at least 50ml.";
     }
-    if (!(Number(dosage.fullDrinkPrice) > 0)) {
+    if (!isDependent && !(Number(dosage.fullDrinkPrice) > 0)) {
       return "Full drink price must be greater than zero.";
     }
     if (
@@ -580,6 +649,8 @@ export function NewProductPage({
         : "100",
     );
     setServingUnit(selected?.serving_unit === "ml" ? "ml" : "g");
+    setIsDependent(selected?.is_dependent === true);
+    setCanBeAddedToIds([]);
     setComponentRows(toComponentRows(selected));
     setDosage(toDosageValue(selected));
     setSplashId(
@@ -626,7 +697,9 @@ export function NewProductPage({
     setError("");
     try {
       const response = await fetch(
-        `/api/portal/product-lines/${productLine.id}/products`,
+        isEditing
+          ? `/api/portal/product-lines/${productLine.id}/products/${editingProductId}`
+          : `/api/portal/product-lines/${productLine.id}/products`,
         {
           method: isEditing ? "PUT" : "POST",
           headers: { "content-type": "application/json" },
@@ -678,6 +751,8 @@ export function NewProductPage({
               product: Number(dosage.product),
               conversionFactor: Number(dosage.conversionFactor),
             },
+            isDependent,
+            canBeAddedToIds,
           }),
         },
       );
@@ -810,6 +885,23 @@ export function NewProductPage({
               : undefined
           }
           onCupChange={setCupId}
+          isDependent={isDependent}
+          onIsDependentChange={(value) => {
+            setIsDependent(value);
+            if (value) {
+              setDosage((current) => ({
+                ...current,
+                fullDrinkPrice: "",
+                smallDrinkPrice: "",
+                smallDrinkVolume: "",
+              }));
+            }
+          }}
+          canBeAddedToIds={canBeAddedToIds}
+          canBeAddedToOptions={canBeAddedToOptions}
+          onCanBeAddedToChange={setCanBeAddedToIds}
+          mixAllowlistEmpty={allowedLineIds.size === 0}
+          mixPreview={mixPreview}
         />
         <NewProductVisualPreview
           brand={selectedBrand}

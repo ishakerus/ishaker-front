@@ -6,6 +6,8 @@ import {
   FormControl,
   FormHelperText,
   FormLabel,
+  HStack,
+  Text,
   VStack,
 } from "@chakra-ui/react";
 import type { FormEventHandler, ReactNode } from "react";
@@ -13,17 +15,27 @@ import {
   SearchableImageSelect,
   type SearchableImageOption,
 } from "./SearchableImageSelect";
+import {
+  RelationMultiSelect,
+  type RelationMultiSelectOption,
+} from "./RelationMultiSelect";
 
 type ProductLineFormProps = {
   baseOptions: SearchableImageOption[];
   baseProductLineId: string;
+  isBaseSelectionDisabled?: boolean;
   canSubmit: boolean;
   customSplashId: string;
   cupSelector?: ReactNode;
   duplicateSuggestion?: ReactNode;
   error?: string;
+  canBeAddedToHint?: string;
+  canBeAddedToIds?: string[];
+  canBeAddedToOptions?: RelationMultiSelectOption[];
+  canEditMixRules?: boolean;
   isSubmitting: boolean;
   onBaseProductLineChange: (value: string) => void;
+  onCanBeAddedToChange?: (value: string[]) => void;
   onCustomSplashChange: (value: string) => void;
   onSubmit: FormEventHandler<HTMLFormElement>;
   splashOptions: SearchableImageOption[];
@@ -33,13 +45,19 @@ type ProductLineFormProps = {
 export function ProductLineForm({
   baseOptions,
   baseProductLineId,
+  isBaseSelectionDisabled = false,
   canSubmit,
   customSplashId,
   cupSelector,
   duplicateSuggestion,
   error,
+  canBeAddedToHint,
+  canBeAddedToIds = [],
+  canBeAddedToOptions = [],
+  canEditMixRules = false,
   isSubmitting,
   onBaseProductLineChange,
+  onCanBeAddedToChange,
   onCustomSplashChange,
   onSubmit,
   splashOptions,
@@ -67,10 +85,34 @@ export function ProductLineForm({
             value={baseProductLineId}
             onChange={onBaseProductLineChange}
             isSearchable={false}
+            isDisabled={isBaseSelectionDisabled}
           />
         </FormControl>
 
         {duplicateSuggestion}
+
+        {canEditMixRules ? (
+          <FormControl>
+            <FormLabel>Can be added to</FormLabel>
+            <RelationMultiSelect
+              ariaLabel="Select product lines this line can be added to"
+              emptyLabel="No other template product lines are available."
+              options={canBeAddedToOptions}
+              value={canBeAddedToIds}
+              onChange={(value) => onCanBeAddedToChange?.(value)}
+              placeholder="Select destination product lines"
+            />
+            <FormHelperText>
+              Products from this line may be poured into products from the selected lines.
+            </FormHelperText>
+          </FormControl>
+        ) : canBeAddedToHint ? (
+          <HStack align="start" spacing="2">
+            <Text color="bg.300" fontSize="sm">
+              Can be added to: {canBeAddedToHint}
+            </Text>
+          </HStack>
+        ) : null}
 
         <FormControl>
           <FormLabel>Custom splash</FormLabel>

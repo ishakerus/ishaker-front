@@ -21,6 +21,10 @@ export const getServerSideProps: GetServerSideProps<NewProductLinePageProps> = a
 
   const rootParams = new URLSearchParams();
   rootParams.set("filters[author][username][$eq]", "root");
+  rootParams.set("fields[0]", "name");
+  rootParams.set("fields[1]", "isPopular");
+  rootParams.set("fields[2]", "is_template");
+  rootParams.set("populate[can_be_added_to][fields][0]", "name");
   rootParams.set("populate[cups][populate][image]", "*");
   rootParams.set("populate[cups][populate][default_splash][populate][images]", "*");
   rootParams.set("populate[custom_splash]", "*");

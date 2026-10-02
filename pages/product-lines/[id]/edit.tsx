@@ -37,7 +37,14 @@ export const getServerSideProps: GetServerSideProps<NewProductLinePageProps> = a
   } else {
     ownParams.set("filters[author][id][$eq]", String(result.session.user.id));
   }
-  ownParams.set("populate[base_product_line]", "*");
+  ownParams.set("populate[base_product_line][fields][0]", "name");
+  ownParams.set("fields[0]", "name");
+  ownParams.set("fields[1]", "is_template");
+  ownParams.set("populate[can_be_added_to][fields][0]", "name");
+  ownParams.set(
+    "populate[base_product_line][populate][can_be_added_to][fields][0]",
+    "name",
+  );
   ownParams.set("populate[cups][populate][image]", "*");
   ownParams.set("populate[cups][populate][default_splash][populate][images]", "*");
   ownParams.set("populate[custom_splash]", "*");
@@ -45,6 +52,10 @@ export const getServerSideProps: GetServerSideProps<NewProductLinePageProps> = a
 
   const rootParams = new URLSearchParams();
   rootParams.set("filters[author][username][$eq]", "root");
+  rootParams.set("fields[0]", "name");
+  rootParams.set("fields[1]", "isPopular");
+  rootParams.set("fields[2]", "is_template");
+  rootParams.set("populate[can_be_added_to][fields][0]", "name");
   rootParams.set("populate[cups][populate][image]", "*");
   rootParams.set("populate[cups][populate][default_splash][populate][images]", "*");
   rootParams.set("populate[custom_splash]", "*");
@@ -68,8 +79,16 @@ export const getServerSideProps: GetServerSideProps<NewProductLinePageProps> = a
       `/api/splashes?${params.toString()}`,
     );
 
+  const templateParams = new URLSearchParams();
+  templateParams.set("filters[is_template][$eq]", "true");
+  templateParams.set("fields[0]", "name");
+  templateParams.set("fields[1]", "is_template");
+  templateParams.set("populate[can_be_added_to][fields][0]", "name");
+  templateParams.set("sort[0]", "name:ASC");
+  templateParams.set("pagination[pageSize]", "2000");
+
   try {
-    const [ownProductLines, rootProductLines, splashes] =
+    const [ownProductLines, rootProductLines, templateProductLines, splashes] =
       await Promise.all([
         requestStrapiRestAsService<PortalProductLine[]>(
           `/api/product-lines?${ownParams.toString()}`,
@@ -77,6 +96,11 @@ export const getServerSideProps: GetServerSideProps<NewProductLinePageProps> = a
         requestStrapiRestAsService<PortalProductLine[]>(
           `/api/product-lines?${rootParams.toString()}`,
         ),
+        result.session.access === "product"
+          ? requestStrapiRestAsService<PortalProductLine[]>(
+              `/api/product-lines?${templateParams.toString()}`,
+            )
+          : Promise.resolve([]),
         requestWithSplashOwnershipFallback(
           splashParams,
           loadSplashes,
@@ -94,6 +118,7 @@ export const getServerSideProps: GetServerSideProps<NewProductLinePageProps> = a
         session: result.session,
         productLine: ownProductLines[0],
         rootProductLines,
+        templateProductLines,
         splashes,
       },
     };

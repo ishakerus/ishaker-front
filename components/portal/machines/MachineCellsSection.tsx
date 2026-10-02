@@ -45,6 +45,8 @@ import type {
 } from "../../../types/portal";
 import { ContainersPreview } from "../product-lines/ContainersPreview";
 import { CONTAINER_WIDTH } from "../product-lines/PowderContainer";
+import { MachineMixesSection } from "./MachineMixesSection";
+import { useCustomDialog } from "../../shared/CustomDialog";
 
 type MachineCellsSectionProps = {
   machineId: string | number;
@@ -148,6 +150,7 @@ export function MachineCellsSection({
   onCellsSaved,
 }: MachineCellsSectionProps) {
   const toast = useToast();
+  const { showConfirm } = useCustomDialog();
   const [cells, setCells] = useState(() =>
     buildDrafts(initialCells, containerCount),
   );
@@ -379,13 +382,13 @@ export function MachineCellsSection({
 
   const deleteInvalidCell = async (cell: CellDraft) => {
     if (cell.id === null) return;
-    if (
-      !window.confirm(
-        `Delete the duplicate assignment for container ${cell.position}? This cannot be undone.`,
-      )
-    ) {
-      return;
-    }
+    const confirmed = await showConfirm({
+      title: "Delete duplicate assignment?",
+      message: `Delete the duplicate assignment for container ${cell.position}? This cannot be undone.`,
+      confirmLabel: "Delete",
+      tone: "danger",
+    });
+    if (!confirmed) return;
 
     setDeletingCellId(cell.id);
     setSaveError("");
@@ -903,6 +906,7 @@ export function MachineCellsSection({
             {assignmentCards}
           </>
         )}
+        <MachineMixesSection cells={previewCells} />
         {invalidLegacyCells.length ? (
           <Box>
             <Text fontWeight="800" color="red.200" mb="3">

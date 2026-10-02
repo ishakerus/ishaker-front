@@ -4,6 +4,7 @@ import { getPortalSessionFromApiRequest } from "../../../../../../lib/portal/aut
 import { deleteProductAndAssignments } from "../../../../../../services/server/deleteProduct";
 import { requestStrapiRestAsService } from "../../../../../../services/server/strapiClient";
 import type { PortalProductLine } from "../../../../../../types/portal";
+import { handler as handleProductUpsert } from "../products";
 
 const asId = (value: unknown) => {
   const id = typeof value === "string" ? value.trim() : "";
@@ -11,8 +12,8 @@ const asId = (value: unknown) => {
 };
 
 async function handler(req: NextApiRequest, res: NextApiResponse) {
-  if (req.method !== "PATCH" && req.method !== "DELETE") {
-    res.setHeader("Allow", ["PATCH", "DELETE"]);
+  if (!["PUT", "PATCH", "DELETE"].includes(req.method || "")) {
+    res.setHeader("Allow", ["PUT", "PATCH", "DELETE"]);
     return res.status(405).json({ error: "method_not_allowed" });
   }
 
@@ -29,6 +30,11 @@ async function handler(req: NextApiRequest, res: NextApiResponse) {
   );
   if (!productLineId || !productId) {
     return res.status(400).json({ error: "invalid_product" });
+  }
+
+  if (req.method === "PUT") {
+    req.body = { ...(req.body || {}), existingProductId: productId };
+    return handleProductUpsert(req, res);
   }
 
   const params = new URLSearchParams();
@@ -65,22 +71,50 @@ async function handler(req: NextApiRequest, res: NextApiResponse) {
     }
 
     if (req.method === "PATCH") {
-      if (typeof req.body?.isActive !== "boolean") {
+      const hasActive = typeof req.body?.isActive === "boolean";
+      const hasDependent = typeof req.body?.is_dependent === "boolean";
+      const hasMixTargets = Array.isArray(req.body?.can_be_added_to);
+      if (!hasActive && !hasDependent && !hasMixTargets) {
         return res.status(400).json({
-          error: "invalid_active_state",
-          message: "Active state must be true or false.",
+          error: "invalid_product_update",
+          message: "No supported product fields were provided.",
         });
       }
+
+      const targetIds = hasMixTargets
+        ? req.body.can_be_added_to.map((value: unknown) =>
+            asId(typeof value === "number" ? String(value) : value),
+          )
+        : [];
+      if (
+        hasMixTargets &&
+        (targetIds.some((id: string) => !id) ||
+          targetIds.length > 200 ||
+          new Set(targetIds).size !== targetIds.length)
+      ) {
+        return res.status(400).json({
+          error: "invalid_mix_targets",
+          message: "Choose unique drinks for this add-on.",
+        });
+      }
+
+      const data = {
+        ...(hasActive ? { isActive: req.body.isActive } : {}),
+        ...(hasDependent ? { is_dependent: req.body.is_dependent } : {}),
+        ...(hasMixTargets
+          ? { can_be_added_to: targetIds.map(Number) }
+          : {}),
+      };
 
       await requestStrapiRestAsService(`/api/products/${productId}`, {
         method: "PUT",
         body: JSON.stringify({
-          data: { isActive: req.body.isActive },
+          data,
         }),
       });
 
       return res.status(200).json({
-        product: { id: productId, isActive: req.body.isActive },
+        product: { id: productId, ...data },
       });
     }
 
@@ -89,12 +123,21 @@ async function handler(req: NextApiRequest, res: NextApiResponse) {
     return res.status(200).json({ deleted: true, ...cleanup });
   } catch (error) {
     console.error(
-      "[portal/product-lines/:id/products/:productId] deletion failed:",
+      "[portal/product-lines/:id/products/:productId] mutation failed:",
       error,
     );
-    return res.status(500).json({
+    const apiError = error as {
+      status?: number;
+      response?: { error?: { message?: string } };
+    };
+    const status = apiError.status && apiError.status < 500 ? apiError.status : 500;
+    return res.status(status).json({
       error: "product_deletion_failed",
-      message: "Product could not be deleted.",
+      message:
+        apiError.response?.error?.message ||
+        (req.method === "DELETE"
+          ? "Product could not be deleted."
+          : "Product could not be updated."),
     });
   }
 }

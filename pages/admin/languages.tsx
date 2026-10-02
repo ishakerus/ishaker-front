@@ -23,6 +23,7 @@ import { AdminShell } from "../../components/admin";
 import { requireAdminSession } from "../../lib/admin/auth";
 import { getSmallestMediaUrl } from "../../lib/portal/media";
 import Loader from "../../components/shared/Loader";
+import { useCustomDialog } from "../../components/shared/CustomDialog";
 
 const empty = {
   id: "",
@@ -51,6 +52,7 @@ const encode = (file: File) =>
 
 export default function AdminLanguagesPage() {
   const toast = useToast();
+  const { showConfirm } = useCustomDialog();
   const [languages, setLanguages] = useState<any[]>([]);
   const [form, setForm] = useState(empty);
   const [isLoading, setIsLoading] = useState(true);
@@ -120,7 +122,14 @@ export default function AdminLanguagesPage() {
   };
 
   const remove = async () => {
-    if (!form.id || !window.confirm(`Delete language "${form.name}"?`)) return;
+    if (!form.id) return;
+    const confirmed = await showConfirm({
+      title: "Delete language?",
+      message: `Delete language “${form.name}”?`,
+      confirmLabel: "Delete",
+      tone: "danger",
+    });
+    if (!confirmed) return;
     const response = await fetch(`/api/admin/languages/${form.id}`, {
       method: "DELETE",
     });

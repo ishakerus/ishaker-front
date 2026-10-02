@@ -43,6 +43,7 @@ import {
 } from "../lib/portal/promoDates";
 import { Box3D } from "../styles/theme/custom";
 import { isQrSafePromoCode } from "../lib/portal/promoQr";
+import { useCustomDialog } from "../components/shared/CustomDialog";
 
 const INVALID_QR_CODE_MESSAGE =
   "Use only letters, digits, - or _, up to 32 characters.";
@@ -124,6 +125,7 @@ export default function PromosPage({
   serverNow,
   loadError,
 }: PromosPageProps) {
+  const { showConfirm } = useCustomDialog();
   const router = useRouter();
   const [title, setTitle] = useState("");
   const [code, setCode] = useState("");
@@ -138,8 +140,8 @@ export default function PromosPage({
   const [notes, setNotes] = useState("");
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [error, setError] = useState("");
-  const [revokingId, setRevokingId] = useState<string | null>(null);
-  const [revokeError, setRevokeError] = useState("");
+  const [deletingId, setDeletingId] = useState<string | null>(null);
+  const [deleteError, setDeleteError] = useState("");
   const [currentTime, setCurrentTime] = useState(serverNow);
   const [useLocalDates, setUseLocalDates] = useState(false);
   const [qrPromo, setQrPromo] = useState<PromoCode | null>(null);
@@ -170,38 +172,38 @@ export default function PromosPage({
     if (date) setEndAt(toDateTimeLocalValue(date));
   };
 
-  const revokePromo = async (promo: PromoCode) => {
-    if (
-      !window.confirm(
-        `Revoke promo code “${promo.code}”? It will no longer be accepted by machines.`,
-      )
-    ) {
-      return;
-    }
+  const deletePromo = async (promo: PromoCode) => {
+    const confirmed = await showConfirm({
+      title: "Delete promo code?",
+      message: `Permanently delete promo code “${promo.code}”? This cannot be undone.`,
+      confirmLabel: "Delete",
+      tone: "danger",
+    });
+    if (!confirmed) return;
 
     const id = String(promo.id);
-    setRevokeError("");
-    setRevokingId(id);
+    setDeleteError("");
+    setDeletingId(id);
     try {
       const response = await fetch(
         `/api/portal/promos/${encodeURIComponent(id)}`,
         {
-          method: "PATCH",
+          method: "DELETE",
         },
       );
       const payload = await response.json().catch(() => null);
       if (!response.ok) {
-        throw new Error(payload?.message || "Promo code could not be revoked.");
+        throw new Error(payload?.message || "Promo code could not be deleted.");
       }
       await router.replace(router.asPath);
-    } catch (revokeFailure) {
-      setRevokeError(
-        revokeFailure instanceof Error
-          ? revokeFailure.message
-          : "Promo code could not be revoked.",
+    } catch (deleteFailure) {
+      setDeleteError(
+        deleteFailure instanceof Error
+          ? deleteFailure.message
+          : "Promo code could not be deleted.",
       );
     } finally {
-      setRevokingId(null);
+      setDeletingId(null);
     }
   };
 
@@ -223,9 +225,13 @@ export default function PromosPage({
       return;
     }
 
-    const confirmed = window.confirm(
-      "Create this promo code in the live client portal? Clients will be able to use it immediately once activated downstream.",
-    );
+    const confirmed = await showConfirm({
+      title: "Create promo code?",
+      message:
+        "Create this promo code in the live client portal? Clients will be able to use it immediately once activated downstream.",
+      confirmLabel: "Create",
+      tone: "warning",
+    });
     if (!confirmed) return;
 
     setIsSubmitting(true);
@@ -275,7 +281,7 @@ export default function PromosPage({
               Existing promo codes
             </Text>
             {loadError ? <Text color="orange.200">{loadError}</Text> : null}
-            {revokeError ? <Text color="red.300">{revokeError}</Text> : null}
+            {deleteError ? <Text color="red.300">{deleteError}</Text> : null}
             {promos.length ? (
               <VStack
                 spacing="4"
@@ -312,7 +318,7 @@ export default function PromosPage({
                       >
                         {promo.title || "Untitled promo"}
                       </Text>
-                      <Box flexShrink="0">
+                      <HStack flexShrink="0" spacing="2">
                         {promo.status === "cancelled" ? (
                           <Text
                             color="red.300"
@@ -330,22 +336,21 @@ export default function PromosPage({
                           >
                             Expired
                           </Text>
-                        ) : (
-                          <IconButton
-                            size="xs"
-                            aria-label="Revoke promo code"
-                            minH="8"
-                            minW="8"
-                            colorScheme="red"
-                            variant="outline"
-                            isLoading={revokingId === String(promo.id)}
-                            isDisabled={Boolean(revokingId)}
-                            onClick={() => void revokePromo(promo)}
-                          >
-                            <FiTrash2 size="1.2rem" />
-                          </IconButton>
-                        )}
-                      </Box>
+                        ) : null}
+                        <IconButton
+                          size="xs"
+                          aria-label={`Delete promo code ${promo.code}`}
+                          minH="8"
+                          minW="8"
+                          colorScheme="red"
+                          variant="outline"
+                          isLoading={deletingId === String(promo.id)}
+                          isDisabled={Boolean(deletingId)}
+                          onClick={() => void deletePromo(promo)}
+                        >
+                          <FiTrash2 size="1.2rem" />
+                        </IconButton>
+                      </HStack>
                     </HStack>
 
                     <Grid

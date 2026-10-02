@@ -12,6 +12,7 @@ import { useState } from "react";
 import { capitalizeName } from "../../../lib/formatName";
 import { getSmallestMediaUrl } from "../../../lib/portal/media";
 import type { PortalProduct, PortalProductLine } from "../../../types/portal";
+import { useCustomDialog } from "../../shared/CustomDialog";
 
 export function OrphanProductCard({
   product,
@@ -21,13 +22,20 @@ export function OrphanProductCard({
   productLines: PortalProductLine[];
 }) {
   const router = useRouter();
+  const { showAlert, showConfirm } = useCustomDialog();
   const [isDeleting, setIsDeleting] = useState(false);
   const [isAttaching, setIsAttaching] = useState(false);
   const [productLineId, setProductLineId] = useState("");
   const image = getSmallestMediaUrl(product.custom_main || product.taste?.main);
 
   const deleteProduct = async () => {
-    if (!window.confirm(`Delete orphan product “${product.name}”?`)) return;
+    const confirmed = await showConfirm({
+      title: "Delete orphan product?",
+      message: `Delete orphan product “${product.name}”? This action cannot be undone.`,
+      confirmLabel: "Delete",
+      tone: "danger",
+    });
+    if (!confirmed) return;
     setIsDeleting(true);
     try {
       const response = await fetch(`/api/portal/products/${product.id}`, {
@@ -39,9 +47,14 @@ export function OrphanProductCard({
       }
       router.reload();
     } catch (error) {
-      window.alert(
-        error instanceof Error ? error.message : "Product could not be deleted.",
-      );
+      await showAlert({
+        title: "Delete failed",
+        message:
+          error instanceof Error
+            ? error.message
+            : "Product could not be deleted.",
+        tone: "danger",
+      });
       setIsDeleting(false);
     }
   };
@@ -61,9 +74,14 @@ export function OrphanProductCard({
       }
       router.reload();
     } catch (error) {
-      window.alert(
-        error instanceof Error ? error.message : "Product could not be attached.",
-      );
+      await showAlert({
+        title: "Attach failed",
+        message:
+          error instanceof Error
+            ? error.message
+            : "Product could not be attached.",
+        tone: "danger",
+      });
       setIsAttaching(false);
     }
   };

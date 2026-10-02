@@ -61,6 +61,7 @@ const createProductParams = (session: PortalSession) => {
   params.set("fields[0]", "name");
   params.set("fields[1]", "isActive");
   params.set("fields[2]", "product_type");
+  params.set("fields[3]", "is_dependent");
   params.set("populate[custom_main][fields][0]", "url");
   params.set("populate[custom_main][fields][1]", "formats");
   params.set("populate[taste][populate][main][fields][0]", "url");
@@ -82,6 +83,7 @@ const createProductParams = (session: PortalSession) => {
   params.set("populate[brand][populate][logo][fields][0]", "url");
   params.set("populate[brand][populate][logo][fields][1]", "formats");
   params.set("populate[dosage]", "*");
+  params.set("populate[can_be_added_to][fields][0]", "name");
   params.set("populate[cup][fields][0]", "name");
   params.set("populate[cup][populate][image][fields][0]", "url");
   params.set("populate[cup][populate][image][fields][1]", "formats");

@@ -49,7 +49,7 @@ type SubmittedComponent = {
 
 type SubmittedDosage = {
   full_drink_volume: number;
-  full_drink_price: number;
+  full_drink_price: number | null;
   small_drink_volume: number | null;
   small_drink_price: number | null;
   water: number;
@@ -121,7 +121,10 @@ const optionalAmount = (value: unknown, allowZero = false) => {
     : undefined;
 };
 
-const parseDosage = (value: unknown): SubmittedDosage | null => {
+const parseDosage = (
+  value: unknown,
+  isDependent: boolean,
+): SubmittedDosage | null => {
   if (!value || typeof value !== "object") return null;
   const dosage = value as Record<string, unknown>;
   const fullDrinkVolume = Number(dosage.fullDrinkVolume);
@@ -135,7 +138,7 @@ const parseDosage = (value: unknown): SubmittedDosage | null => {
     ![fullDrinkVolume, water, product, conversionFactor].every(
       (amount) => Number.isFinite(amount) && amount > 0,
     ) ||
-    typeof fullDrinkPrice !== "number" ||
+    (!isDependent && typeof fullDrinkPrice !== "number") ||
     smallDrinkVolume === undefined ||
     smallDrinkPrice === undefined
   ) {
@@ -143,7 +146,8 @@ const parseDosage = (value: unknown): SubmittedDosage | null => {
   }
   return {
     full_drink_volume: fullDrinkVolume,
-    full_drink_price: fullDrinkPrice,
+    full_drink_price:
+      typeof fullDrinkPrice === "number" ? fullDrinkPrice : null,
     small_drink_volume: smallDrinkVolume,
     small_drink_price: smallDrinkPrice,
     water,
@@ -190,7 +194,10 @@ const parseComponents = (value: unknown): SubmittedComponent[] | null => {
     : null;
 };
 
-async function handler(req: NextApiRequest, res: NextApiResponse) {
+export async function handler(
+  req: NextApiRequest,
+  res: NextApiResponse,
+) {
   if (req.method !== "POST" && req.method !== "PUT") {
     res.setHeader("Allow", ["POST", "PUT"]);
     return res.status(405).json({ error: "method_not_allowed" });
@@ -207,8 +214,13 @@ async function handler(req: NextApiRequest, res: NextApiResponse) {
   const circleId = asId(req.body?.circleId);
   const mainImageId = asId(req.body?.mainImageId);
   const cupId = asId(req.body?.cupId);
+  const isDependent = req.body?.isDependent === true;
+  const rawCanBeAddedToIds = req.body?.canBeAddedToIds;
+  const canBeAddedToIds = Array.isArray(rawCanBeAddedToIds)
+    ? rawCanBeAddedToIds.map(asId)
+    : [];
   const submittedComponents = parseComponents(req.body?.components);
-  const submittedDosage = parseDosage(req.body?.dosage);
+  const submittedDosage = parseDosage(req.body?.dosage, isDependent);
   const name = capitalizeName(asString(req.body?.name));
   const description = asString(req.body?.description);
   const productType = asString(req.body?.productType);
@@ -249,7 +261,20 @@ async function handler(req: NextApiRequest, res: NextApiResponse) {
   if (!submittedDosage) {
     return res.status(400).json({
       error: "invalid_dosage",
-      message: "Required dosage values and the full-drink price must be positive.",
+      message: isDependent
+        ? "Required dosage values must be positive."
+        : "Required dosage values and the full-drink price must be positive.",
+    });
+  }
+  if (
+    !Array.isArray(rawCanBeAddedToIds) ||
+    canBeAddedToIds.some((id) => !id) ||
+    canBeAddedToIds.length > 200 ||
+    new Set(canBeAddedToIds).size !== canBeAddedToIds.length
+  ) {
+    return res.status(400).json({
+      error: "invalid_mix_targets",
+      message: "Choose unique drinks for this add-on.",
     });
   }
   if (submittedDosage.full_drink_volume < 50) {
@@ -660,6 +685,8 @@ async function handler(req: NextApiRequest, res: NextApiResponse) {
             components: { set: componentIds },
             nutrition,
             dosage: submittedDosage,
+            is_dependent: isDependent,
+            can_be_added_to: canBeAddedToIds.map(Number),
           },
         }),
       });
@@ -698,6 +725,8 @@ async function handler(req: NextApiRequest, res: NextApiResponse) {
           ...(componentIds.length ? { components: { connect: componentIds } } : {}),
           nutrition,
           dosage: submittedDosage,
+          is_dependent: isDependent,
+          can_be_added_to: canBeAddedToIds.map(Number),
         },
       }),
     });

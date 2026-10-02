@@ -81,6 +81,7 @@ type ProductComponentsTableProps = {
   onPriceCurrencyChange: (value: string) => void;
   servingQuantity: string;
   servingUnit: "g" | "ml";
+  isDependent?: boolean;
 };
 
 const MAX_COMPONENTS = 50;
@@ -105,6 +106,7 @@ export function ProductComponentsTable({
   onPriceCurrencyChange,
   servingQuantity,
   servingUnit,
+  isDependent = false,
 }: ProductComponentsTableProps) {
   const [draggedRowId, setDraggedRowId] = useState("");
   const [focusedRowId, setFocusedRowId] = useState("");
@@ -441,7 +443,7 @@ export function ProductComponentsTable({
       <Box mt="7">
         <HStack justify="space-between" align="center" mb="1">
           <FormLabel mb="0">Dosage</FormLabel>
-          <HStack as="label" spacing="2" cursor="pointer">
+          {!isDependent ? <HStack as="label" spacing="2" cursor="pointer">
             <Text color="bg.200" fontSize="sm">
               Small drink option
             </Text>
@@ -461,7 +463,7 @@ export function ProductComponentsTable({
                 }
               }}
             />
-          </HStack>
+          </HStack> : null}
         </HStack>
         <Text color="bg.300" fontSize="sm" mb="3">
           Machine recipe for one drink.
@@ -486,7 +488,7 @@ export function ProductComponentsTable({
             </NumberInput>
           </FormControl>
 
-          <FormControl>
+          {!isDependent ? <FormControl>
             <HStack flexWrap="wrap">
               <Icon as={FaCoins} color="acid.300" />
               <Text as="span">Full drink price</Text>
@@ -513,10 +515,10 @@ export function ProductComponentsTable({
             <FormHelperText>
               This is the library default. A container can override the price.
             </FormHelperText>
-          </FormControl>
+          </FormControl> : null}
         </SimpleGrid>
 
-        <Collapse in={isSmallDrinkEnabled}>
+        <Collapse in={!isDependent && isSmallDrinkEnabled}>
           <SimpleGrid columns={{ base: 1, md: 2 }} spacing="4" mt="4">
             <FormControl isInvalid={Boolean(smallDrinkVolumeError)}>
               <HStack>

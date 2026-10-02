@@ -10,8 +10,8 @@ const promoIdFrom = (value: string | string[] | undefined) => {
 };
 
 async function handler(req: NextApiRequest, res: NextApiResponse) {
-  if (req.method !== "PATCH") {
-    res.setHeader("Allow", ["PATCH"]);
+  if (req.method !== "PATCH" && req.method !== "DELETE") {
+    res.setHeader("Allow", ["PATCH", "DELETE"]);
     return res.status(405).json({ error: "method_not_allowed" });
   }
 
@@ -43,6 +43,13 @@ async function handler(req: NextApiRequest, res: NextApiResponse) {
       });
     }
 
+    if (req.method === "DELETE") {
+      await requestStrapiRestAsService(`/api/promo-codes/${promo.id}`, {
+        method: "DELETE",
+      });
+      return res.status(200).json({ deleted: true });
+    }
+
     if (promo.status !== "cancelled") {
       await requestStrapiRestAsService(`/api/promo-codes/${promo.id}`, {
         method: "PUT",
@@ -52,10 +59,16 @@ async function handler(req: NextApiRequest, res: NextApiResponse) {
 
     return res.status(200).json({ revoked: true });
   } catch (error) {
-    console.error("[portal/promos/:id] revoke failed:", error);
+    const deleting = req.method === "DELETE";
+    console.error(
+      `[portal/promos/:id] ${deleting ? "delete" : "revoke"} failed:`,
+      error,
+    );
     return res.status(500).json({
-      error: "promo_revoke_failed",
-      message: "Promo code could not be revoked.",
+      error: deleting ? "promo_delete_failed" : "promo_revoke_failed",
+      message: deleting
+        ? "Promo code could not be deleted."
+        : "Promo code could not be revoked.",
     });
   }
 }

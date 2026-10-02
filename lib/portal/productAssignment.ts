@@ -40,7 +40,10 @@ export const getProductAssignmentProblems = (
       detail: "Attach the product to a product line.",
     });
   }
-  if (!Number.isFinite(price) || price <= 0) {
+  if (
+    product.is_dependent !== true &&
+    (!Number.isFinite(price) || price <= 0)
+  ) {
     problems.push({
       code: "no_usable_price",
       detail: "Set a full-drink price greater than zero.",

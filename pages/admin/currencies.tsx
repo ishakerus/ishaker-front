@@ -24,6 +24,7 @@ import { requireAdminSession } from "../../lib/admin/auth";
 import { formatMoney } from "../../lib/portal/currency";
 import type { Currency } from "../../types/strapi";
 import Loader from "../../components/shared/Loader";
+import { useCustomDialog } from "../../components/shared/CustomDialog";
 
 const emptyForm = {
   id: "",
@@ -40,6 +41,7 @@ const emptyForm = {
 
 export default function AdminCurrenciesPage() {
   const toast = useToast();
+  const { showConfirm } = useCustomDialog();
   const [currencies, setCurrencies] = useState<Currency[]>([]);
   const [form, setForm] = useState(emptyForm);
   const [isLoading, setIsLoading] = useState(true);
@@ -104,7 +106,14 @@ export default function AdminCurrenciesPage() {
   };
 
   const remove = async () => {
-    if (!form.id || !window.confirm(`Delete currency "${form.code}"?`)) return;
+    if (!form.id) return;
+    const confirmed = await showConfirm({
+      title: "Delete currency?",
+      message: `Delete currency “${form.code}”?`,
+      confirmLabel: "Delete",
+      tone: "danger",
+    });
+    if (!confirmed) return;
     const response = await fetch(`/api/admin/currencies/${form.id}`, {
       method: "DELETE",
     });

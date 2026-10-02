@@ -53,6 +53,10 @@ export const getServerSideProps: GetServerSideProps<NewProductPageProps> = async
   params.set("populate[cups][populate][image][fields][1]", "formats");
   params.set("populate[base_product_line][fields][0]", "name");
   params.set(
+    "populate[base_product_line][populate][can_be_added_to][fields][0]",
+    "name",
+  );
+  params.set(
     "populate[base_product_line][populate][cups][populate][image][fields][0]",
     "url",
   );
@@ -70,6 +74,7 @@ export const getServerSideProps: GetServerSideProps<NewProductPageProps> = async
   productParams.set("fields[3]", "serving_qty");
   productParams.set("fields[4]", "serving_unit");
   productParams.set("fields[5]", "product_purpose");
+  productParams.set("fields[6]", "is_dependent");
   productParams.set("populate[custom_main][fields][0]", "url");
   productParams.set("populate[custom_main][fields][1]", "formats");
   productParams.set("populate[cup][populate][image][fields][0]", "url");
@@ -95,6 +100,10 @@ export const getServerSideProps: GetServerSideProps<NewProductPageProps> = async
   productParams.set("populate[dosage]", "*");
   productParams.set("populate[author][fields][0]", "username");
   productParams.set("populate[product_line][fields][0]", "name");
+  productParams.set(
+    "populate[can_be_added_to][fields][0]",
+    "name",
+  );
   productParams.set("populate[brand][fields][0]", "name");
   productParams.set("populate[brand][populate][logo][fields][0]", "url");
   productParams.set("populate[brand][populate][logo][fields][1]", "formats");
@@ -154,6 +163,30 @@ export const getServerSideProps: GetServerSideProps<NewProductPageProps> = async
   currencyParams.set("sort[0]", "code:ASC");
   currencyParams.set("pagination[pageSize]", "2000");
 
+  const candidateParams = new URLSearchParams();
+  if (result.session.access === "client") {
+    candidateParams.set(
+      "filters[author][client][id][$eq]",
+      String(result.session.client.id),
+    );
+  } else {
+    candidateParams.set(
+      "filters[author][id][$eq]",
+      String(result.session.user.id),
+    );
+  }
+  candidateParams.set("fields[0]", "name");
+  candidateParams.set("fields[1]", "is_dependent");
+  candidateParams.set("populate[dosage]", "*");
+  candidateParams.set("populate[can_be_added_to][fields][0]", "name");
+  candidateParams.set("populate[product_line][fields][0]", "name");
+  candidateParams.set(
+    "populate[product_line][populate][base_product_line][fields][0]",
+    "name",
+  );
+  candidateParams.set("sort[0]", "name:ASC");
+  candidateParams.set("pagination[pageSize]", "2000");
+
   const loadSplashes = async () => {
     const request = (query: URLSearchParams) =>
       requestStrapiRestAsService<PortalSplash[]>(
@@ -191,6 +224,7 @@ export const getServerSideProps: GetServerSideProps<NewProductPageProps> = async
       components,
       brands,
       currencies,
+      candidateProducts,
     ] = await Promise.all([
       requestStrapiRestAsService<PortalProduct[]>(
         `/api/products?${productParams.toString()}`,
@@ -215,6 +249,9 @@ export const getServerSideProps: GetServerSideProps<NewProductPageProps> = async
       ),
       requestStrapiRestAsService<Currency[]>(
         `/api/currencies?${currencyParams.toString()}`,
+      ),
+      requestStrapiRestAsService<PortalProduct[]>(
+        `/api/products?${candidateParams.toString()}`,
       ),
     ]);
 
@@ -246,6 +283,7 @@ export const getServerSideProps: GetServerSideProps<NewProductPageProps> = async
         components,
         brands,
         currencies,
+        candidateProducts,
       },
     };
   } catch (error) {

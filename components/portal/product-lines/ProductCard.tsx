@@ -1,4 +1,5 @@
 import {
+  Badge,
   Box,
   Divider,
   Flex,
@@ -16,6 +17,7 @@ import { getSmallestMediaUrl } from "../../../lib/portal/media";
 import type { PortalCup, PortalProduct } from "../../../types/portal";
 import { DeleteProductDialog } from "./DeleteProductDialog";
 import { Box3D } from "../../../styles/theme/custom";
+import { useCustomDialog } from "../../shared/CustomDialog";
 
 type ProductCardProps = {
   product: PortalProduct;
@@ -29,6 +31,7 @@ export function ProductCard({
   defaultCup,
 }: ProductCardProps) {
   const router = useRouter();
+  const { showAlert } = useCustomDialog();
   const deleteDialog = useDisclosure();
   const [isDeleting, setIsDeleting] = useState(false);
   const [isActive, setIsActive] = useState(product.isActive !== false);
@@ -55,6 +58,9 @@ export function ProductCard({
       )
       .at(-1),
   );
+  const mixTargetNames = (product.can_be_added_to || []).map((target) =>
+    capitalizeName(target.name),
+  );
 
   const updateActiveState = async (nextIsActive: boolean) => {
     const previousIsActive = isActive;
@@ -77,11 +83,14 @@ export function ProductCard({
       }
     } catch (error) {
       setIsActive(previousIsActive);
-      window.alert(
-        error instanceof Error
-          ? error.message
-          : "Product status could not be updated.",
-      );
+      await showAlert({
+        title: "Update failed",
+        message:
+          error instanceof Error
+            ? error.message
+            : "Product status could not be updated.",
+        tone: "danger",
+      });
     } finally {
       setIsUpdatingActive(false);
     }
@@ -101,11 +110,14 @@ export function ProductCard({
       deleteDialog.onClose();
       router.reload();
     } catch (error) {
-      window.alert(
-        error instanceof Error
-          ? error.message
-          : "Product could not be deleted.",
-      );
+      await showAlert({
+        title: "Delete failed",
+        message:
+          error instanceof Error
+            ? error.message
+            : "Product could not be deleted.",
+        tone: "danger",
+      });
       setIsDeleting(false);
     }
   };
@@ -281,10 +293,27 @@ export function ProductCard({
             </Box>
           </Box>
         </Flex>
-        <HStack justify="space-between" align="center" gap="3">
-          <Text color="white" fontSize="md" fontWeight="750" noOfLines={1}>
-            {`${productName} | ${brandName || "No brand"}`}
-          </Text>
+        <HStack justify="space-between" align="flex-start" gap="3">
+          <Box minW="0">
+            <HStack spacing="2">
+              <Text color="white" fontSize="md" fontWeight="750" noOfLines={1}>
+                {`${productName} | ${brandName || "No brand"}`}
+              </Text>
+              {product.is_dependent ? (
+                <Badge colorScheme="purple" flexShrink={0}>
+                  Add-on
+                </Badge>
+              ) : null}
+            </HStack>
+            {mixTargetNames.length ? (
+              <Text color="bg.300" fontSize="sm" mt="1" noOfLines={1}>
+                Goes into: {mixTargetNames.slice(0, 3).join(", ")}
+                {mixTargetNames.length > 3
+                  ? ` +${mixTargetNames.length - 3}`
+                  : ""}
+              </Text>
+            ) : null}
+          </Box>
           <Box onClick={(event) => event.stopPropagation()}>
             <IconButton
               aria-label={`Edit ${productName}`}

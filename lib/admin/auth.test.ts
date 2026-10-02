@@ -99,7 +99,7 @@ test('support matches client portal mutations while retaining admin-only boundar
     assert.ok(canSupportWriteStrapi(`/api/${collection}`, "POST"));
     assert.ok(canSupportWriteStrapi(`/api/${collection}/1`, "PUT"));
   }
-  for (const collection of ['machine-cells','preset-cells','products','product-lines','translation-entries']) {
+  for (const collection of ['machine-cells','preset-cells','products','product-lines','translation-entries','promo-codes']) {
     assert.equal(canSupportWriteStrapi(`/api/${collection}/1`, "DELETE"), true);
   }
   for (const collection of ['clients','promo-codes','components','tastes','splashes','circles','portal-registration-requests','door-accesses']) {
@@ -112,6 +112,7 @@ test('support matches client portal mutations while retaining admin-only boundar
   assert.equal(canSupportUseRoute("/api/portal/nayax-settings", "PUT", "portal"), true);
   assert.equal(canSupportUseRoute("/api/portal/register-machine", "POST", "portal"), true);
   assert.equal(canSupportUseRoute("/api/portal/promos/1", "PATCH", "portal"), true);
+  assert.equal(canSupportUseRoute("/api/portal/promos/1", "DELETE", "portal"), true);
   assert.equal(canSupportUseRoute("/api/portal/machines/1/door-key", "POST", "portal"), true);
   assert.equal(canSupportUseRoute("/api/portal/product-lines/1", "DELETE", "portal"), true);
   assert.equal(canSupportUseRoute("/api/admin/machines/1/door-key", "POST", "admin"), false);

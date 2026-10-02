@@ -29,6 +29,7 @@ import { getProductLineIcon } from "./NewProductLinePage";
 import { ProductCard } from "./ProductCard";
 import { Box3D } from "../../../styles/theme/custom";
 import { IoMdAdd } from "react-icons/io";
+import { useCustomDialog } from "../../shared/CustomDialog";
 
 type ProductLineCardProps = {
   productLine: PortalProductLine;
@@ -40,6 +41,7 @@ export function ProductLineCard({
   onAddProduct,
 }: ProductLineCardProps) {
   const router = useRouter();
+  const { showAlert } = useCustomDialog();
   const deleteDialog = useDisclosure();
   const [isDeleting, setIsDeleting] = useState(false);
   const [isActive, setIsActive] = useState(productLine.isActive !== false);
@@ -74,11 +76,14 @@ export function ProductLineCard({
       }
     } catch (error) {
       setIsActive(previousIsActive);
-      window.alert(
-        error instanceof Error
-          ? error.message
-          : "Product line status could not be updated.",
-      );
+      await showAlert({
+        title: "Update failed",
+        message:
+          error instanceof Error
+            ? error.message
+            : "Product line status could not be updated.",
+        tone: "danger",
+      });
     } finally {
       setIsUpdatingActive(false);
     }
@@ -102,11 +107,14 @@ export function ProductLineCard({
       deleteDialog.onClose();
       router.reload();
     } catch (error) {
-      window.alert(
-        error instanceof Error
-          ? error.message
-          : "Product line could not be deleted.",
-      );
+      await showAlert({
+        title: "Delete failed",
+        message:
+          error instanceof Error
+            ? error.message
+            : "Product line could not be deleted.",
+        tone: "danger",
+      });
       setIsDeleting(false);
     }
   };

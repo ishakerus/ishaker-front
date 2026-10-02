@@ -45,6 +45,14 @@ export const getMachineCells = async (
     "url",
   );
   params.set("populate[product][populate][dosage]", "*");
+  params.set("populate[product][fields][0]", "name");
+  params.set("populate[product][fields][1]", "isActive");
+  params.set("populate[product][fields][2]", "product_type");
+  params.set("populate[product][fields][3]", "is_dependent");
+  params.set(
+    "populate[product][populate][can_be_added_to][fields][0]",
+    "name",
+  );
   params.set("sort[0]", "position:asc");
   params.set("pagination[pageSize]", "2000");
 
@@ -62,6 +70,7 @@ export const getMachineCatalogProducts = async (
   params.set("fields[0]", "name");
   params.set("fields[1]", "product_type");
   params.set("fields[2]", "isActive");
+  params.set("fields[3]", "is_dependent");
   params.set("populate[product_line][fields][0]", "name");
   params.set(
     "populate[product_line][populate][cups][populate][image][fields][0]",
@@ -82,6 +91,7 @@ export const getMachineCatalogProducts = async (
   );
   params.set("populate[custom_circle][fields][0]", "color");
   params.set("populate[dosage]", "*");
+  params.set("populate[can_be_added_to][fields][0]", "name");
   params.set("sort[0]", "name:asc");
   params.set("pagination[pageSize]", PAGE_SIZE);
 

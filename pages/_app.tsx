@@ -10,6 +10,7 @@ import theme from "../styles/theme";
 import store from "../redux/store";
 import { Footer } from "../components/Footer";
 import RouteLoadingOverlay from "../components/shared/RouteLoadingOverlay";
+import { CustomDialogProvider } from "../components/shared/CustomDialog";
 
 function MyApp({ Component, pageProps }: AppProps) {
   useEffect(() => {
@@ -34,25 +35,27 @@ function MyApp({ Component, pageProps }: AppProps) {
       </Head>
       <Provider store={store}>
         <ChakraProvider theme={theme}>
-          <DefaultSeo
-            titleTemplate="%s | iShaker"
-            defaultTitle="iShaker"
-            description="A polished digital home for iShaker."
-            openGraph={{
-              type: "website",
-              locale: "en_US",
-              siteName: "iShaker",
-            }}
-          />
-          <RouteLoadingOverlay />
-          <SupportSessionBanner session={pageProps.session} />
-          <Component {...pageProps} />
-          <Footer
-            hasKnownClient={
-              pageProps.session?.access === "client" &&
-              Boolean(pageProps.session?.client?.id)
-            }
-          />
+          <CustomDialogProvider>
+            <DefaultSeo
+              titleTemplate="%s | iShaker"
+              defaultTitle="iShaker"
+              description="A polished digital home for iShaker."
+              openGraph={{
+                type: "website",
+                locale: "en_US",
+                siteName: "iShaker",
+              }}
+            />
+            <RouteLoadingOverlay />
+            <SupportSessionBanner session={pageProps.session} />
+            <Component {...pageProps} />
+            <Footer
+              hasKnownClient={
+                pageProps.session?.access === "client" &&
+                Boolean(pageProps.session?.client?.id)
+              }
+            />
+          </CustomDialogProvider>
         </ChakraProvider>
       </Provider>
     </>

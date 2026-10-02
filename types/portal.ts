@@ -60,8 +60,13 @@ export type PortalCatalogProduct = {
   id: number;
   name: string;
   isActive?: boolean;
+  is_dependent?: boolean | null;
+  can_be_added_to?: Array<Pick<PortalProduct, "id" | "name">>;
   product_type?: "powder" | "concentrate" | null;
-  product_line?: Pick<PortalProductLine, "id" | "name" | "cups"> | null;
+  product_line?: Pick<
+    PortalProductLine,
+    "id" | "name" | "cups" | "base_product_line"
+  > | null;
   brand?: PortalBrand | null;
   cup?: PortalCup | null;
   custom_main?: PortalMedia | null;
@@ -147,8 +152,13 @@ export type PortalProduct = {
   id: string | number;
   name: string;
   isActive?: boolean;
+  is_dependent?: boolean | null;
+  can_be_added_to?: PortalProduct[];
   author?: Pick<PortalUser, "id" | "username" | "email"> | null;
-  product_line?: Pick<PortalProductLine, "id" | "name"> | null;
+  product_line?: Pick<
+    PortalProductLine,
+    "id" | "name" | "base_product_line"
+  > | null;
   brand?: PortalBrand | null;
   cup?: PortalCup | null;
   description?: string | null;
@@ -207,10 +217,15 @@ export type PortalProductLine = {
   name: string;
   isActive?: boolean;
   isPopular?: boolean;
+  is_template?: boolean;
+  can_be_added_to?: Array<Pick<PortalProductLine, "id" | "name">>;
   author?: Pick<PortalUser, "id" | "username" | "email"> | null;
   client?: Pick<Client, "id" | "company"> | null;
   machines?: Machine[];
-  base_product_line?: Pick<PortalProductLine, "id" | "name" | "cups"> | null;
+  base_product_line?: Pick<
+    PortalProductLine,
+    "id" | "name" | "cups" | "can_be_added_to"
+  > | null;
   cups?: PortalCup[];
   brands?: PortalBrand[];
   custom_splash?: PortalSplash | null;

@@ -50,6 +50,7 @@ import type {
 export type NewProductLinePageProps = {
   session: PortalSession;
   rootProductLines: PortalProductLine[];
+  templateProductLines?: PortalProductLine[];
   existingProductLines?: PortalProductLine[];
   splashes: PortalSplash[];
   productLine?: PortalProductLine;
@@ -112,6 +113,7 @@ export const getProductLineIcon = (name: string) =>
 export function NewProductLinePage({
   session,
   rootProductLines,
+  templateProductLines = [],
   existingProductLines = [],
   splashes,
   productLine,
@@ -121,6 +123,11 @@ export function NewProductLinePage({
   const router = useRouter();
   const toast = useToast();
   const isEditing = Boolean(productLine?.id);
+  const isStaffTemplate = Boolean(
+    isEditing &&
+      session.access === "product" &&
+      productLine?.is_template === true,
+  );
   const initialBaseLine = !isEditing
     ? rootProductLines.find(
         (line) => String(line.id) === initialBaseProductLineId,
@@ -134,7 +141,9 @@ export function NewProductLinePage({
     ),
   );
   const [baseProductLineId, setBaseProductLineId] = useState(
-    productLine?.base_product_line?.id
+    isStaffTemplate && productLine?.id
+      ? String(productLine.id)
+      : productLine?.base_product_line?.id
       ? String(productLine.base_product_line.id)
       : initialBaseLine
         ? String(initialBaseLine.id)
@@ -157,13 +166,30 @@ export function NewProductLinePage({
           : "",
   );
   const [isSubmitting, setIsSubmitting] = useState(false);
+  const [canBeAddedToIds, setCanBeAddedToIds] = useState(
+    (productLine?.can_be_added_to || []).map((line) => String(line.id)),
+  );
   const [error, setError] = useState("");
   const [serverDuplicate, setServerDuplicate] =
     useState<PortalProductLine | null>(null);
 
+  const baseOptionLines = useMemo(
+    () =>
+      isStaffTemplate && productLine
+        ? Array.from(
+            new Map(
+              [productLine, ...rootProductLines].map((line) => [
+                String(line.id),
+                line,
+              ]),
+            ).values(),
+          )
+        : rootProductLines,
+    [isStaffTemplate, productLine, rootProductLines],
+  );
   const baseOptions = useMemo(
     () =>
-      [...rootProductLines]
+      [...baseOptionLines]
         .sort(
           (left, right) =>
             Number(Boolean(right.isPopular)) -
@@ -180,7 +206,7 @@ export function NewProductLinePage({
             ? { subtitle: "Popular", subtitleColor: "green.300" }
             : {}),
         })),
-    [rootProductLines],
+    [baseOptionLines],
   );
   const splashOptions = useMemo(
     () =>
@@ -244,13 +270,31 @@ export function NewProductLinePage({
   const splashIsEmpty = customSplashId
     ? customSplashResponse?.splash.isEmpty
     : undefined;
-  const canSubmit = Boolean(
-    name.trim().length >= 2 &&
-    baseProductLineId &&
-    cupId &&
-    !duplicateProductLine &&
-    !loadError,
-  );
+  const canSubmit = isStaffTemplate
+    ? !loadError
+    : Boolean(
+        name.trim().length >= 2 &&
+          baseProductLineId &&
+          cupId &&
+          !duplicateProductLine &&
+          !loadError,
+      );
+  const canBeAddedToOptions = templateProductLines
+    .filter(
+      (line) =>
+        line.is_template === true && String(line.id) !== String(productLine?.id),
+    )
+    .map((line) => ({
+      id: String(line.id),
+      label: capitalizeName(line.name),
+    }));
+  const inheritedMixTargets = (
+    selectedBaseLine?.can_be_added_to ||
+    productLine?.base_product_line?.can_be_added_to ||
+    []
+  )
+    .map((line) => capitalizeName(line.name))
+    .join(", ");
 
   const onSubmit = async (event: FormEvent<HTMLFormElement>) => {
     event.preventDefault();
@@ -272,6 +316,7 @@ export function NewProductLinePage({
               baseProductLineId,
               cupId,
               customSplashId,
+              ...(isStaffTemplate ? { canBeAddedToIds } : {}),
             }),
           },
         );
@@ -362,7 +407,17 @@ export function NewProductLinePage({
           <ProductLineForm
             baseOptions={baseOptions}
             baseProductLineId={baseProductLineId}
+            isBaseSelectionDisabled={isStaffTemplate}
             canSubmit={canSubmit}
+            canEditMixRules={isStaffTemplate}
+            canBeAddedToIds={canBeAddedToIds}
+            canBeAddedToOptions={canBeAddedToOptions}
+            onCanBeAddedToChange={setCanBeAddedToIds}
+            canBeAddedToHint={
+              session.access === "client"
+                ? inheritedMixTargets || "None"
+                : undefined
+            }
             customSplashId={customSplashId}
             duplicateSuggestion={
               duplicateProductLine ? (

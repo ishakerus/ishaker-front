@@ -22,6 +22,7 @@ import { AdminShell } from "../../components/admin";
 import { requireAdminSession } from "../../lib/admin/auth";
 import { getMediaUrl } from "../../lib/portal/media";
 import Loader from "../../components/shared/Loader";
+import { useCustomDialog } from "../../components/shared/CustomDialog";
 
 const categories = ["event", "screen", "cup", "payment", "button"];
 const statuses = ["draft", "reviewed", "approved"];
@@ -38,6 +39,7 @@ const emptyForm = {
 
 export default function AdminVoiceClipsPage() {
   const toast = useToast();
+  const { showConfirm } = useCustomDialog();
   const [clips, setClips] = useState<any[]>([]);
   const [languages, setLanguages] = useState<any[]>([]);
   const [cups, setCups] = useState<any[]>([]);
@@ -136,9 +138,14 @@ export default function AdminVoiceClipsPage() {
   };
 
   const remove = async () => {
-    if (!form.id || !window.confirm(`Delete voice clip at ${derivedPath}?`)) {
-      return;
-    }
+    if (!form.id) return;
+    const confirmed = await showConfirm({
+      title: "Delete voice clip?",
+      message: `Delete the voice clip at ${derivedPath}?`,
+      confirmLabel: "Delete",
+      tone: "danger",
+    });
+    if (!confirmed) return;
     const response = await fetch(`/api/admin/voice-clips/${form.id}`, {
       method: "DELETE",
     });

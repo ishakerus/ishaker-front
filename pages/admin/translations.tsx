@@ -25,9 +25,11 @@ import { useEffect, useMemo, useState } from "react";
 import { AdminShell } from "../../components/admin";
 import Loader from "../../components/shared/Loader";
 import { requireAdminSession } from "../../lib/admin/auth";
+import { useCustomDialog } from "../../components/shared/CustomDialog";
 
 export default function AdminTranslationsPage() {
   const toast = useToast();
+  const { showConfirm } = useCustomDialog();
   const [translations, setTranslations] = useState<any[]>([]);
   const [query, setQuery] = useState("");
   const [namespace, setNamespace] = useState("");
@@ -105,7 +107,13 @@ export default function AdminTranslationsPage() {
   };
 
   const deleteKey = async (translation: any) => {
-    if (!window.confirm(`Delete key "${translation.key}" and all entries?`)) return;
+    const confirmed = await showConfirm({
+      title: "Delete translation key?",
+      message: `Delete key “${translation.key}” and all of its entries?`,
+      confirmLabel: "Delete",
+      tone: "danger",
+    });
+    if (!confirmed) return;
     const response = await fetch(`/api/admin/translations/${translation.id}`, {
       method: "DELETE",
     });

@@ -52,6 +52,7 @@ import {
   canAssignProduct,
   getProductAssignmentProblems,
 } from "../../lib/portal/productAssignment";
+import { useCustomDialog } from "../../components/shared/CustomDialog";
 
 type Row = {
   id?: number;
@@ -103,6 +104,7 @@ const fillPhysicalSlots = (cells: Row[], containerCount: number | null) => {
 
 export default function AdminPresetsPage() {
   const toast = useToast();
+  const { showConfirm } = useCustomDialog();
   const confirm = useDisclosure();
   const [data, setData] = useState<any>(null);
   const [form, setForm] = useState(emptyForm);
@@ -271,7 +273,14 @@ export default function AdminPresetsPage() {
   };
 
   const remove = async () => {
-    if (!form.id || !window.confirm(`Delete preset "${form.name}"?`)) return;
+    if (!form.id) return;
+    const confirmed = await showConfirm({
+      title: "Delete preset?",
+      message: `Delete preset “${form.name}”? This action cannot be undone.`,
+      confirmLabel: "Delete",
+      tone: "danger",
+    });
+    if (!confirmed) return;
     const response = await fetch(`/api/admin/presets/${form.id}`, {
       method: "DELETE",
     });

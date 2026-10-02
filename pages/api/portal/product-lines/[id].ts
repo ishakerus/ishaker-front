@@ -19,6 +19,10 @@ const asId = (value: unknown) => {
   return /^\d+$/.test(id) ? id : "";
 };
 
+const strapiErrorMessage = (error: unknown, fallback: string) =>
+  (error as { response?: { error?: { message?: string } } })?.response?.error
+    ?.message || fallback;
+
 const loadVisibleSplash = async (id: string, userId: string | number) => {
   const params = new URLSearchParams();
   params.set("filters[id][$eq]", id);
@@ -115,6 +119,63 @@ async function handler(req: NextApiRequest, res: NextApiResponse) {
           0,
         ),
       });
+    }
+
+    if (Object.prototype.hasOwnProperty.call(req.body || {}, "canBeAddedToIds")) {
+      if (
+        session.access !== "product" ||
+        ownedProductLine.is_template !== true
+      ) {
+        return res.status(403).json({
+          error: "mix_rules_access_denied",
+          message: "Only iShaker staff can edit product-line mix rules.",
+        });
+      }
+      const rawTargetIds = req.body?.canBeAddedToIds;
+      const targetIds = Array.isArray(rawTargetIds)
+        ? rawTargetIds.map(asId)
+        : [];
+      if (
+        !Array.isArray(rawTargetIds) ||
+        targetIds.some((id) => !id) ||
+        targetIds.length > 200 ||
+        new Set(targetIds).size !== targetIds.length
+      ) {
+        return res.status(400).json({
+          error: "invalid_mix_lines",
+          message: "Choose unique template product lines.",
+        });
+      }
+
+      if (targetIds.length) {
+        const targetParams = new URLSearchParams();
+        targetParams.set("filters[is_template][$eq]", "true");
+        targetIds.forEach((id, index) =>
+          targetParams.set(`filters[id][$in][${index}]`, id),
+        );
+        targetParams.set("fields[0]", "id");
+        targetParams.set("pagination[pageSize]", "2000");
+        const targets = await requestStrapiRestAsService<PortalProductLine[]>(
+          `/api/product-lines?${targetParams.toString()}`,
+        );
+        if (targets.length !== targetIds.length) {
+          return res.status(400).json({
+            error: "invalid_mix_lines",
+            message: "Every destination must be a template product line.",
+          });
+        }
+      }
+
+      const productLine = await requestStrapiRestAsService<PortalProductLine>(
+        `/api/product-lines/${ownedProductLine.id}`,
+        {
+          method: "PUT",
+          body: JSON.stringify({
+            data: { can_be_added_to: targetIds.map(Number) },
+          }),
+        },
+      );
+      return res.status(200).json({ productLine });
     }
 
     if (Object.prototype.hasOwnProperty.call(req.body || {}, "isActive")) {
@@ -241,9 +302,13 @@ async function handler(req: NextApiRequest, res: NextApiResponse) {
     return res.status(200).json({ productLine });
   } catch (error) {
     console.error("[portal/product-lines/:id] request failed:", error);
-    return res.status(500).json({
+    const status = (error as { status?: number }).status;
+    return res.status(status && status < 500 ? status : 500).json({
       error: "product_line_request_failed",
-      message: `Product line could not be ${req.method === "DELETE" ? "deleted" : "updated"}.`,
+      message: strapiErrorMessage(
+        error,
+        `Product line could not be ${req.method === "DELETE" ? "deleted" : "updated"}.`,
+      ),
     });
   }
 }
