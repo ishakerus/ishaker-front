@@ -1,3 +1,4 @@
+import { requireCatalogAuthorRelation } from "../../../../services/server/catalogOwnership";
 import type { NextApiRequest, NextApiResponse } from "next";
 import { withSupportPortalApi } from "../../../../lib/admin/access";
 import { getPortalSessionFromApiRequest } from "../../../../lib/portal/auth";
@@ -21,6 +22,7 @@ async function handler(req: NextApiRequest, res: NextApiResponse) {
     const query = new URLSearchParams({ "filters[name][$eqi]": name, "fields[0]": "name", "pagination[pageSize]": "1" });
     const existing = await requestStrapiRestAsService<unknown[]>(`/api/brands?${query}`);
     if (existing.length) return res.status(409).json({ message: "A brand with this name already exists. Pick another name." });
+    await requireCatalogAuthorRelation("brands", session.client.id);
     const uploaded = await uploadPortalImages([logo]);
     if (!uploaded[0]?.id) throw new Error("The logo could not be uploaded.");
     const brand = await requestStrapiRestAsService("/api/brands", {
@@ -30,7 +32,7 @@ async function handler(req: NextApiRequest, res: NextApiResponse) {
     return res.status(201).json({ ok: true, brand });
   } catch (error) {
     const status = (error as { status?: number }).status;
-    return res.status(status === 400 ? 400 : 500).json({ message: error instanceof Error ? error.message : "Brand creation failed." });
+    return res.status(status === 400 || status === 503 ? status : 500).json({ message: error instanceof Error ? error.message : "Brand creation failed." });
   }
 }
 export default withSupportPortalApi(handler);

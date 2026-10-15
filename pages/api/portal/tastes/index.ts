@@ -1,3 +1,4 @@
+import { requireCatalogAuthorRelation } from "../../../../services/server/catalogOwnership";
 import { withSupportPortalApi } from "../../../../lib/admin/access";
 import type { NextApiRequest, NextApiResponse } from "next";
 import { getPortalSessionFromApiRequest } from "../../../../lib/portal/auth";
@@ -111,6 +112,7 @@ async function handler(req: NextApiRequest, res: NextApiResponse) {
       return res.status(400).json({ error: "invalid_splash", message: 'Select a splash whose name starts with "color ".' });
     }
 
+    await requireCatalogAuthorRelation("tastes", session.client.id);
     const uploaded = await uploadPortalImages([main, ...generatedFrames]);
 
     if (!Array.isArray(uploaded) || uploaded.length !== GENERATED_FRAME_COUNT + 1) {
@@ -151,8 +153,9 @@ async function handler(req: NextApiRequest, res: NextApiResponse) {
     return res.status(201).json({ ok: true, taste });
   } catch (error) {
     const message = error instanceof Error ? error.message : "Custom taste submission failed.";
+    const status = (error as { status?: number }).status;
     console.error("[portal/tastes] submission failed:", error);
-    return res.status((error as { status?: number }).status === 400 ? 400 : 500).json({ error: "taste_submission_failed", message });
+    return res.status(status === 400 || status === 503 ? status : 500).json({ error: "taste_submission_failed", message });
   }
 }
 
