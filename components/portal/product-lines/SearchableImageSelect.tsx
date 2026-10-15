@@ -14,6 +14,7 @@ import {
   VStack,
   Text,
 } from "@chakra-ui/react";
+import NextLink from "next/link";
 import {
   type ReactNode,
   useEffect,
@@ -49,6 +50,8 @@ export type SearchableImageSelectProps = {
   isDisabled?: boolean;
   isSearchable?: boolean;
   onShowMore?: () => void;
+  showMoreLabel?: string;
+  createHref?: string;
   optionLayout?: "list" | "tiles";
   fallbackOption?: SearchableImageOption;
 };
@@ -64,6 +67,8 @@ export function SearchableImageSelect({
   isDisabled = false,
   isSearchable = true,
   onShowMore,
+  showMoreLabel = "Show images",
+  createHref,
   optionLayout = "list",
   fallbackOption,
 }: SearchableImageSelectProps) {
@@ -323,6 +328,30 @@ export function SearchableImageSelect({
     </VStack>
   );
 
+  const selectorActions = onShowMore || createHref ? (
+    <HStack spacing="3" my={{ base: "3", md: "4" }}>
+      {onShowMore ? (
+        <Button
+          type="button"
+          variant="no_contrast"
+          flex="1"
+          leftIcon={<FaImages size="1rem" />}
+          onClick={() => {
+            onShowMore();
+            closeAndBlur();
+          }}
+        >
+          {showMoreLabel}
+        </Button>
+      ) : null}
+      {createHref ? (
+        <Button as={NextLink} href={createHref} variant="no_contrast">
+          Create
+        </Button>
+      ) : null}
+    </HStack>
+  ) : null;
+
   return (
     <Box
       ref={containerRef}
@@ -546,26 +575,12 @@ export function SearchableImageSelect({
               p="3"
               onMouseDown={(event) => event.preventDefault()}
             >
-              {onShowMore ? (
-                <Button
-                  type="button"
-                  variant="no_contrast"
-                  w="full"
-                  my="4"
-                  leftIcon={<FaImages size="1rem" />}
-                  onClick={() => {
-                    onShowMore();
-                    closeAndBlur();
-                  }}
-                >
-                  Show images
-                </Button>
-              ) : null}
+              {selectorActions}
               {optionList(
                 `${Math.max(
                   80,
                   (menuPosition?.maxHeight ?? 0) -
-                    (onShowMore ? 100 : 24),
+                    (onShowMore || createHref ? 100 : 24),
                 )}px`,
               )}
             </Box>
@@ -616,21 +631,7 @@ export function SearchableImageSelect({
                 borderColor="whiteAlpha.200"
               />
             ) : null}
-            {onShowMore ? (
-              <Button
-                type="button"
-                variant="no_contrast"
-                w="full"
-                my="3"
-                leftIcon={<FaImages size="1rem" />}
-                onClick={() => {
-                  onShowMore();
-                  closeAndBlur();
-                }}
-              >
-                Show images
-              </Button>
-            ) : null}
+            {selectorActions}
             <Box flex="1" minH="0" pt="3">
               {optionList("full")}
             </Box>

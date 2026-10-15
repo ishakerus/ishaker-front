@@ -5,11 +5,18 @@ import type { PortalCircle, PortalMedia } from "../../../../types/portal";
 type TasteMainPreviewProps = {
   circle?: PortalCircle | null;
   main?: PortalMedia | null;
+  mainImageUrl?: string;
+  compact?: boolean;
 };
 
-export function TasteMainPreview({ circle, main }: TasteMainPreviewProps) {
+export function TasteMainPreview({
+  circle,
+  main,
+  mainImageUrl,
+  compact = false,
+}: TasteMainPreviewProps) {
   const circleImage = getMediaUrl(circle?.images?.[0]);
-  const mainImage = getMediaUrl(main);
+  const mainImage = mainImageUrl || getMediaUrl(main);
 
   return (
     <Box
@@ -17,7 +24,7 @@ export function TasteMainPreview({ circle, main }: TasteMainPreviewProps) {
       border="1px solid"
       borderColor="whiteAlpha.100"
       borderRadius="2xl"
-      p={{ base: "5", md: "7" }}
+      p={compact ? "4" : { base: "5", md: "7" }}
     >
       <Text color="bg.50" fontSize="lg" fontWeight="800" mb="4">
         Taste preview
@@ -29,7 +36,7 @@ export function TasteMainPreview({ circle, main }: TasteMainPreviewProps) {
           position="relative"
           mx="auto"
           w="full"
-          minH={{ base: "280px", md: "320px" }}
+          minH={compact ? "200px" : { base: "280px", md: "320px" }}
           display="flex"
           alignItems="center"
           justifyContent="center"
@@ -54,7 +61,7 @@ export function TasteMainPreview({ circle, main }: TasteMainPreviewProps) {
             position="relative"
             zIndex="1"
             w="full"
-            maxW="320px"
+            maxW={compact ? "180px" : "320px"}
             aspectRatio="1"
           >
             {circleImage ? (
@@ -94,7 +101,7 @@ export function TasteMainPreview({ circle, main }: TasteMainPreviewProps) {
           </Box>
         </Box>
       ) : (
-        <VStack minH="240px" justify="center" color="bg.300">
+        <VStack minH={compact ? "160px" : "240px"} justify="center" color="bg.300">
           <Text>Select a taste main image and circle.</Text>
         </VStack>
       )}

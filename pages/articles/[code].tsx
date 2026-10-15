@@ -2,6 +2,7 @@ import type { GetServerSideProps } from "next";
 import { NextSeo } from "next-seo";
 import { ArticlePage } from "../../components/articles/ArticlePage";
 import { requestStrapiRestAsService } from "../../services/server/strapiClient";
+import { catalogGuides } from "../../lib/articles/catalogGuides";
 import type { Article } from "../../types/article";
 
 type ArticleRouteProps = {
@@ -25,6 +26,8 @@ export const getServerSideProps: GetServerSideProps<ArticleRouteProps> = async (
   const code = rawCode?.trim().toLowerCase();
 
   if (!code) return { notFound: true };
+  const guide = catalogGuides.find((article) => article.code === code);
+  if (guide) return { props: { article: guide } };
 
   const query = new URLSearchParams({
     "filters[code][$eq]": code,

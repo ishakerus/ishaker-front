@@ -1,3 +1,4 @@
+import { addCatalogVisibilityFilters } from "../../../lib/portal/catalogAssets";
 import { withSupportPortalApi } from "../../../lib/admin/access";
 import type { NextApiRequest, NextApiResponse } from "next";
 import { getPortalSessionFromApiRequest } from "../../../lib/portal/auth";
@@ -64,7 +65,7 @@ async function handler(
       return res.status(200).json({ splashes });
     }
     if (type === "tastes") {
-      const params = new URLSearchParams();
+      const params = addCatalogVisibilityFilters(new URLSearchParams(), session.client.id);
       params.set("fields[0]", "name");
       params.set("populate[main][fields][0]", "url");
       params.set("populate[main][fields][1]", "formats");

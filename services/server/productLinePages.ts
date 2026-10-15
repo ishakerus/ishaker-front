@@ -1,3 +1,4 @@
+import { addCatalogVisibilityFilters } from "../../lib/portal/catalogAssets";
 import { requestWithSplashOwnershipFallback } from "../../lib/portal/splashOwnership";
 import type {
   PortalBrand,
@@ -552,6 +553,8 @@ export const loadProductEditorPage = async (
     ["populate[logo][fields][0]", "url"],
     ["populate[logo][fields][1]", "formats"],
   ]);
+  addCatalogVisibilityFilters(tasteParams, session.client.id);
+  addCatalogVisibilityFilters(brandParams, session.client.id);
   const currencyParams = new URLSearchParams();
   currencyParams.set("filters[isActive][$ne]", "false");
   currencyParams.set("sort[0]", "code:ASC");
@@ -605,21 +608,13 @@ export const loadProductEditorPage = async (
         `/api/circles?${circleParams.toString()}`,
       ),
     ),
-    cachedReference("product-editor:tastes", () =>
-      requestStrapiRestAsService<PortalTaste[]>(
-        `/api/tastes?${tasteParams.toString()}`,
-      ),
-    ),
+    requestStrapiRestAsService<PortalTaste[]>(`/api/tastes?${tasteParams.toString()}`),
     cachedReference("product-editor:components", () =>
       requestStrapiRestAsService<PortalComponent[]>(
         `/api/components?${componentParams.toString()}`,
       ),
     ),
-    cachedReference("product-editor:brands", () =>
-      requestStrapiRestAsService<PortalBrand[]>(
-        `/api/brands?${brandParams.toString()}`,
-      ),
-    ),
+    requestStrapiRestAsService<PortalBrand[]>(`/api/brands?${brandParams.toString()}`),
     cachedReference("product-editor:currencies", () =>
       requestStrapiRestAsService<Currency[]>(
         `/api/currencies?${currencyParams.toString()}`,

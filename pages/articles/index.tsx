@@ -2,6 +2,7 @@ import type { GetServerSideProps } from "next";
 import { NextSeo } from "next-seo";
 import { ArticlesIndexPage } from "../../components/articles/ArticlesIndexPage";
 import { requestStrapiRestAsService } from "../../services/server/strapiClient";
+import { catalogGuides } from "../../lib/articles/catalogGuides";
 import type { Article } from "../../types/article";
 
 type ArticlesRouteProps = {
@@ -56,9 +57,9 @@ export const getServerSideProps: GetServerSideProps<ArticlesRouteProps> = async 
     }
 
     res.setHeader("Cache-Control", "public, s-maxage=120, stale-while-revalidate=600");
-    return { props: { articles } };
+    return { props: { articles: [...catalogGuides, ...articles.filter((article) => !catalogGuides.some((guide) => guide.code === article.code))] } };
   } catch (error) {
     console.error("[articles] Failed to load articles:", error);
-    return { props: { articles: [] } };
+    return { props: { articles: catalogGuides } };
   }
 };

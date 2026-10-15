@@ -3,10 +3,8 @@ import type { NextApiRequest, NextApiResponse } from "next";
 import { getPortalSessionFromApiRequest } from "../../../../lib/portal/auth";
 import { requestWithSplashOwnershipFallback } from "../../../../lib/portal/splashOwnership";
 import { requestStrapiRestAsService } from "../../../../services/server/strapiClient";
-import {
-  decodePortalImage,
-  uploadPortalImages,
-} from "../../../../services/server/imageUpload";
+import { uploadPortalImages } from "../../../../services/server/imageUpload";
+import { decodeCatalogImage } from "../../../../services/server/catalogImage";
 
 const GENERATED_FRAME_COUNT = 20;
 
@@ -56,6 +54,11 @@ async function handler(req: NextApiRequest, res: NextApiResponse) {
   }
 
   try {
+    const main = decodeCatalogImage(req.body?.main || {}, "main", "Main image");
+    const generatedFrames = rawFrames.map((file: unknown, index: number) =>
+      decodeCatalogImage(file || {}, "frame", `Generated splash frame ${index + 1}`),
+    );
+
     // Reject duplicates before uploading anything: a retried submission
     // must not leave behind another circle, taste and image set.
     const duplicateParams = new URLSearchParams();
@@ -108,10 +111,6 @@ async function handler(req: NextApiRequest, res: NextApiResponse) {
       return res.status(400).json({ error: "invalid_splash", message: 'Select a splash whose name starts with "color ".' });
     }
 
-    const main = decodePortalImage(req.body?.main || {}, "Main image");
-    const generatedFrames = rawFrames.map((file: unknown, index: number) =>
-      decodePortalImage(file || {}, `Generated splash frame ${index + 1}`),
-    );
     const uploaded = await uploadPortalImages([main, ...generatedFrames]);
 
     if (!Array.isArray(uploaded) || uploaded.length !== GENERATED_FRAME_COUNT + 1) {
@@ -144,6 +143,7 @@ async function handler(req: NextApiRequest, res: NextApiResponse) {
           default_splash: customSplash.id,
           isWebsiteVisible: false,
           submission_status: "pending",
+          author: session.client.id,
         },
       }),
     });
@@ -152,7 +152,7 @@ async function handler(req: NextApiRequest, res: NextApiResponse) {
   } catch (error) {
     const message = error instanceof Error ? error.message : "Custom taste submission failed.";
     console.error("[portal/tastes] submission failed:", error);
-    return res.status(500).json({ error: "taste_submission_failed", message });
+    return res.status((error as { status?: number }).status === 400 ? 400 : 500).json({ error: "taste_submission_failed", message });
   }
 }
 

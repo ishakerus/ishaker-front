@@ -7,7 +7,7 @@ import { promisify } from "util";
 import type { NextApiRequest, NextApiResponse } from "next";
 import { getPortalSessionFromApiRequest } from "../../../../lib/portal/auth";
 import { requestWithSplashOwnershipFallback } from "../../../../lib/portal/splashOwnership";
-import { decodePortalImage } from "../../../../services/server/imageUpload";
+import { decodeCatalogImage } from "../../../../services/server/catalogImage";
 import { requestStrapiRestAsService } from "../../../../services/server/strapiClient";
 import { getStrapiBaseUrl } from "../../../../services/fetchers";
 import type { PortalSplash } from "../../../../types/portal";
@@ -112,9 +112,9 @@ async function handler(req: NextApiRequest, res: NextApiResponse) {
       });
     }
 
-    const elements: ReturnType<typeof decodePortalImage>[] = rawElements.map(
+    const elements: ReturnType<typeof decodeCatalogImage>[] = rawElements.map(
       (file: unknown, index: number) =>
-        decodePortalImage(file || {}, `Ingredient image ${index + 1}`),
+        decodeCatalogImage(file || {}, "ingredient", `Ingredient image ${index + 1}`),
     );
 
     temporaryRoot = await fs.mkdtemp(path.join(os.tmpdir(), "ishaker-splash-"));
@@ -192,7 +192,7 @@ async function handler(req: NextApiRequest, res: NextApiResponse) {
   } catch (error) {
     const message = error instanceof Error ? error.message : "Splash generation failed.";
     console.error("[portal/tastes/generate] generation failed:", error);
-    return res.status(500).json({ error: "splash_generation_failed", message });
+    return res.status((error as { status?: number }).status === 400 ? 400 : 500).json({ error: "splash_generation_failed", message });
   } finally {
     if (temporaryRoot) {
       await fs.rm(temporaryRoot, { recursive: true, force: true }).catch(() => undefined);

@@ -1,3 +1,4 @@
+import type { CatalogAuthor } from "../lib/portal/catalogAssets";
 import type { Client, Currency, Machine } from "./strapi";
 
 export type RegistrationDraft = {
@@ -104,6 +105,7 @@ export type PromoCode = {
 };
 
 export type PortalTaste = {
+  author?: CatalogAuthor | null;
   id: string | number;
   name: string;
   color?: string;
@@ -207,6 +209,7 @@ export type PortalCup = {
 };
 
 export type PortalBrand = {
+  author?: CatalogAuthor | null;
   id: string | number;
   name: string;
   logo?: PortalMedia | null;

@@ -209,6 +209,8 @@ export function NewProductForm({
             value={splashId}
             onChange={onVisualChange.splash}
             onShowMore={onShowMoreSplashes}
+            showMoreLabel="See all"
+            createHref="/catalog"
           />
         </FormControl>
 
@@ -273,7 +275,7 @@ export function NewProductForm({
           <HStack justify="space-between" align="center">
             <HStack spacing="1">
               <FormLabel mb="0">Not a drink on its own (add-on only)</FormLabel>
-              <Help text="Shown on the kiosk only as an addition to other drinks, at its full dose." />
+              <Help text="If it's ON then it will be only an addition to other drinks. If it's OFF then it can be ordered as a standalone drink. For example: pure creatine powder can not be a separated drink but can be an addon. But protein powder can be." />
             </HStack>
             <Switch
               aria-label="Not a drink on its own (add-on only)"
@@ -295,7 +297,8 @@ export function NewProductForm({
               py="3"
             >
               <Text color="bg.300" fontSize="sm">
-                This product line can&apos;t be added to other drinks. Ask iShaker support.
+                This product line can&apos;t be added to other drinks. Ask
+                iShaker support.
               </Text>
             </Box>
           ) : (

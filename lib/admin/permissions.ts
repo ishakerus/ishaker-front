@@ -1,7 +1,7 @@
 const writableCollections = new Set([
   "machines", "machine-cells", "clients", "currencies", "presets", "preset-cells",
   "languages", "translations", "translation-entries", "translation-sets", "voice-clips",
-  "products", "product-lines", "components", "tastes", "splashes", "circles",
+  "products", "product-lines", "components", "brands", "tastes", "splashes", "circles",
   "promo-codes", "portal-registration-requests", "door-accesses", "tutorials",
   "tickets",
 ]);
@@ -11,7 +11,7 @@ const writableCollections = new Set([
 // cabinet; admin routes still reject DELETE below.
 const deletableCollections = new Set([
   "machine-cells", "preset-cells", "products", "product-lines",
-  "translation-entries", "promo-codes",
+  "translation-entries", "promo-codes", "tastes", "brands",
 ]);
 
 export const canSupportWriteStrapi = (path: string, method: string) => {

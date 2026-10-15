@@ -24,6 +24,7 @@ import { getStrapiBaseUrl } from "../../services/fetchers";
 
 const toMediaUrl = (src?: string) => {
   if (!src) return "";
+  if (src.startsWith("/guides/")) return src;
   if (/^(https?:)?\/\//i.test(src) || src.startsWith("data:")) return src;
   return `${getStrapiBaseUrl()}${src.startsWith("/") ? "" : "/"}${src}`;
 };

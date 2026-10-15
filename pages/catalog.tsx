@@ -2,7 +2,6 @@ import {
   Alert,
   AlertIcon,
   AspectRatio,
-  Badge,
   Box,
   Button,
   FormControl,
@@ -10,20 +9,30 @@ import {
   FormLabel,
   Image,
   Input,
+  Link,
   SimpleGrid,
   VStack,
   Text,
 } from "@chakra-ui/react";
+import NextLink from "next/link";
 import type { GetServerSideProps } from "next";
 import { useRouter } from "next/router";
-import { FormEvent, useMemo, useState } from "react";
+import { FormEvent, useEffect, useMemo, useRef, useState } from "react";
 import {
   SPLASH_FADE_MS,
   useSplashAnimation,
 } from "../components/home/Splash";
+import { BrandCreateForm } from "../components/portal/catalog/BrandCreateForm";
+import { CatalogCollections } from "../components/portal/catalog/CatalogCollections";
+import { addCatalogVisibilityFilters, validateCatalogFile } from "../lib/portal/catalogAssets";
 import { PortalShell } from "../components/portal/PortalShell";
 import { SearchableImageSelect } from "../components/portal/product-lines/SearchableImageSelect";
+import { TasteMainPreview } from "../components/portal/product-lines/new-product/TasteMainPreview";
 import { requirePortalSession } from "../lib/portal/auth";
+import {
+  generateSplashInBrowser,
+  type GeneratedSplashFrame,
+} from "../lib/portal/generateSplash";
 import { requestWithSplashOwnershipFallback } from "../lib/portal/splashOwnership";
 import { getSmallestMediaUrl } from "../lib/portal/media";
 import {
@@ -32,6 +41,7 @@ import {
 } from "../lib/portal/mediaFilename";
 import { requestStrapiRestAsService } from "../services/server/strapiClient";
 import type {
+  PortalBrand,
   PortalCircle,
   PortalSession,
   PortalSplash,
@@ -41,6 +51,7 @@ import type {
 type CatalogPageProps = {
   session: PortalSession;
   tastes: PortalTaste[];
+  brands: PortalBrand[];
   circles: PortalCircle[];
   splashes: PortalSplash[];
 };
@@ -84,21 +95,38 @@ const encodeFile = (file: File): Promise<EncodedFile> =>
 export default function CatalogPage({
   session,
   tastes = [],
+  brands = [],
   circles = [],
   splashes = [],
 }: CatalogPageProps) {
   const [name, setName] = useState("");
   const [main, setMain] = useState<File | null>(null);
+  const [mainPreviewUrl, setMainPreviewUrl] = useState("");
   const [circleId, setCircleId] = useState("");
   const [splashId, setSplashId] = useState("");
   const [elements, setElements] = useState<File[]>([]);
-  const [generatedFrames, setGeneratedFrames] = useState<EncodedFile[]>([]);
+  const [generatedFrames, setGeneratedFrames] = useState<
+    GeneratedSplashFrame[]
+  >([]);
   const [generatedPreview, setGeneratedPreview] = useState("");
   const [isGenerating, setIsGenerating] = useState(false);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [message, setMessage] = useState("");
   const [isError, setIsError] = useState(false);
   const router = useRouter();
+  const mainSelection = useRef(0);
+  const ingredientSelection = useRef(0);
+  useEffect(() => {
+    if (!main) {
+      setMainPreviewUrl("");
+      return;
+    }
+
+    const url = URL.createObjectURL(main);
+    setMainPreviewUrl(url);
+    return () => URL.revokeObjectURL(url);
+  }, [main]);
+
   const generatedFrameUrls = useMemo(
     () =>
       generatedFrames.map(
@@ -125,21 +153,17 @@ export default function CatalogPage({
     setIsError(false);
     clearGeneratedSplash();
     try {
-      const response = await fetch("/api/portal/tastes/generate", {
-        method: "POST",
-        headers: { "content-type": "application/json" },
-        body: JSON.stringify({
-          name,
-          splashId,
-          elements: await Promise.all(elements.map(encodeFile)),
-        }),
+      const splash = splashes.find((item) => String(item.id) === splashId);
+      if (!splash) throw new Error("Select an existing color splash.");
+      const frames = await generateSplashInBrowser({
+        name,
+        splash,
+        elements,
       });
-      const payload = await response.json();
-      if (!response.ok) {
-        throw new Error(payload?.message || "Splash generation failed.");
-      }
-      setGeneratedFrames(payload.frames || []);
-      setGeneratedPreview(payload.preview || "");
+      setGeneratedFrames(frames);
+      setGeneratedPreview(
+        `data:image/png;base64,${frames[frames.length - 1]?.data || ""}`,
+      );
       setMessage("Custom splash generated. Review the preview, then submit.");
     } catch (error) {
       setIsError(true);
@@ -205,8 +229,8 @@ export default function CatalogPage({
 
   return (
     <PortalShell
-      title="Taste catalog"
-      description="Browse available tastes or submit a custom taste for iShaker review."
+      title="Taste and brand catalog"
+      description="Create and manage your tastes and brands, or browse shared catalog items."
       clientName={session.client.company}
     >
       <Box
@@ -229,11 +253,12 @@ export default function CatalogPage({
               Your submission stays hidden until the iShaker team reviews and
               approves it.
             </Text>
+            <Link as={NextLink} href="/articles/create-taste" color="acid.300">How to create a taste</Link>
           </Box>
 
           <SimpleGrid columns={{ base: 1, lg: 2 }} spacing="8" alignItems="start">
             <VStack spacing="5" align="stretch">
-              <FormControl isRequired>
+              <FormControl isRequired isDisabled={isGenerating || isSubmitting}>
                 <FormLabel>Taste name</FormLabel>
                 <Input
                   value={name}
@@ -247,19 +272,35 @@ export default function CatalogPage({
                 />
               </FormControl>
 
-              <FormControl isRequired>
+              <FormControl isRequired isDisabled={isGenerating || isSubmitting}>
                 <FormLabel>Main image</FormLabel>
                 <Input
                   type="file"
-                  accept="image/png,image/jpeg,image/webp"
+                  accept=".png,image/png"
                   p="1"
-                  onChange={(event) => setMain(event.target.files?.[0] || null)}
+                  onChange={async (event) => {
+                    const input = event.currentTarget;
+                    const file = input.files?.[0];
+                    const version = ++mainSelection.current;
+                    setMain(null);
+                    setMessage("");
+                    if (!file) return;
+                    try {
+                      await validateCatalogFile(file, "main", "Main image");
+                      if (version === mainSelection.current) setMain(file);
+                    } catch (error) {
+                      if (version !== mainSelection.current) return;
+                      input.value = "";
+                      setIsError(true);
+                      setMessage(error instanceof Error ? error.message : "Invalid main image.");
+                    }
+                  }}
                 />
-                <FormHelperText>PNG, JPEG, or WebP; maximum 5 MB.</FormHelperText>
+                <FormHelperText>PNG only, exactly 350 × 350 px, maximum 5 MB. Use a transparent background.</FormHelperText>
                 <MediaKeyPreview file={main} />
               </FormControl>
 
-              <FormControl isRequired>
+              <FormControl isRequired isDisabled={isGenerating || isSubmitting}>
                 <FormLabel>Circle image</FormLabel>
                 <SearchableImageSelect
                   ariaLabel="Select a circle image"
@@ -279,7 +320,7 @@ export default function CatalogPage({
                 </FormHelperText>
               </FormControl>
 
-              <FormControl isRequired>
+              <FormControl isRequired isDisabled={isGenerating || isSubmitting}>
                 <FormLabel>Base color splash</FormLabel>
                 <SearchableImageSelect
                   ariaLabel="Select a base color splash"
@@ -306,20 +347,35 @@ export default function CatalogPage({
                 </FormHelperText>
               </FormControl>
 
-              <FormControl isRequired>
+              <FormControl isRequired isDisabled={isGenerating || isSubmitting}>
                 <FormLabel>Ingredient images</FormLabel>
                 <Input
                   type="file"
                   multiple
-                  accept="image/png,image/jpeg,image/webp"
+                  accept=".png,image/png"
                   p="1"
-                  onChange={(event) => {
-                    setElements(Array.from(event.target.files || []).slice(0, 5));
+                  onChange={async (event) => {
+                    const input = event.currentTarget;
+                    const files = Array.from(input.files || []);
+                    const version = ++ingredientSelection.current;
+                    setElements([]);
                     clearGeneratedSplash();
+                    setMessage("");
+                    if (!files.length) return;
+                    try {
+                      if (files.length !== 5) throw new Error("Choose exactly 5 ingredient images.");
+                      await Promise.all(files.map((file, index) => validateCatalogFile(file, "ingredient", `Ingredient image ${index + 1}`)));
+                      if (version === ingredientSelection.current) setElements(files);
+                    } catch (error) {
+                      if (version !== ingredientSelection.current) return;
+                      input.value = "";
+                      setIsError(true);
+                      setMessage(error instanceof Error ? error.message : "Invalid ingredient images.");
+                    }
                   }}
                 />
                 <FormHelperText>
-                  Choose exactly 5 images, maximum 5 MB each.
+                  Choose exactly 5 PNG images, each 500 × 500 px and no larger than 5 MB. Use transparent backgrounds.
                 </FormHelperText>
               </FormControl>
 
@@ -361,80 +417,57 @@ export default function CatalogPage({
               </Button>
             </VStack>
 
-            <Box
-              bg="bg.800"
-              border="1px solid"
-              borderColor="whiteAlpha.100"
-              borderRadius="2xl"
-              p={{ base: "4", md: "6" }}
+            <VStack
+              spacing="5"
+              align="stretch"
               position={{ lg: "sticky" }}
               top={{ lg: "5" }}
             >
-              <Text color="bg.50" fontSize="lg" fontWeight="800" mb="3">
-                Resulting splash
-              </Text>
-              <AspectRatio ratio={619 / 617} bg="blackAlpha.300" borderRadius="xl">
-                {generatedPreview ? (
-                  <Image
-                    src={generatedActiveFrame || generatedPreview}
-                    alt="Generated custom splash preview"
-                    objectFit="contain"
-                    p="3"
-                    opacity={isPreviewFading ? 0 : 1}
-                    transition={`opacity ${SPLASH_FADE_MS / 1000}s ease`}
-                  />
-                ) : (
-                  <Box display="flex" alignItems="center" justifyContent="center" p="8">
-                    <Text color="bg.300" textAlign="center">
-                      Select a color splash and five ingredient images, then
-                      generate to preview the result.
-                    </Text>
-                  </Box>
-                )}
-              </AspectRatio>
-              <Text color="bg.300" fontSize="sm" mt="3">
-                This preview plays the generated 20-frame animation and holds
-                briefly on its final frame.
-              </Text>
-            </Box>
+              <Box
+                bg="bg.800"
+                border="1px solid"
+                borderColor="whiteAlpha.100"
+                borderRadius="2xl"
+                p={{ base: "4", md: "6" }}
+              >
+                <Text color="bg.50" fontSize="lg" fontWeight="800" mb="3">
+                  Resulting splash
+                </Text>
+                <AspectRatio ratio={619 / 617} bg="blackAlpha.300" borderRadius="xl">
+                  {generatedPreview ? (
+                    <Image
+                      src={generatedActiveFrame || generatedPreview}
+                      alt="Generated custom splash preview"
+                      objectFit="contain"
+                      p="3"
+                      opacity={isPreviewFading ? 0 : 1}
+                      transition={`opacity ${SPLASH_FADE_MS / 1000}s ease`}
+                    />
+                  ) : (
+                    <Box display="flex" alignItems="center" justifyContent="center" p="8">
+                      <Text color="bg.300" textAlign="center">
+                        Select a color splash and five ingredient images, then
+                        generate to preview the result.
+                      </Text>
+                    </Box>
+                  )}
+                </AspectRatio>
+                <Text color="bg.300" fontSize="sm" mt="3">
+                  This preview plays the generated 20-frame animation and holds
+                  briefly on its final frame.
+                </Text>
+              </Box>
+              <TasteMainPreview
+                compact
+                circle={circles.find((circle) => String(circle.id) === circleId)}
+                mainImageUrl={mainPreviewUrl}
+              />
+            </VStack>
           </SimpleGrid>
         </VStack>
       </Box>
-      <SimpleGrid columns={{ base: 3, sm: 4, lg: 6 }} spacing="4" mb="10">
-        {tastes.map((taste) => (
-          <Box
-            key={taste.id}
-            bg="bg.900"
-            border="1px solid"
-            borderColor="whiteAlpha.100"
-            borderRadius="2xl"
-            overflow="hidden"
-          >
-            {taste.main?.url ? (
-              <AspectRatio ratio={1} bg="bg.800">
-                <Image
-                  src={getSmallestMediaUrl(taste.main)}
-                  alt={taste.name}
-                  w="full"
-                  h="full"
-                  objectFit="contain"
-                  p="3"
-                />
-              </AspectRatio>
-            ) : null}
-            <VStack p="5" spacing="2" align="stretch">
-              <Text color="bg.50" fontWeight="800">
-                {taste.name}
-              </Text>
-              {taste.submission_status === "pending" ? (
-                <Badge colorScheme="yellow" alignSelf="flex-start">
-                  Pending review
-                </Badge>
-              ) : null}
-            </VStack>
-          </Box>
-        ))}
-      </SimpleGrid>
+      <BrandCreateForm />
+      <CatalogCollections tastes={tastes} brands={brands} clientId={session.client.id} />
     </PortalShell>
   );
 }
@@ -452,8 +485,21 @@ export const getServerSideProps: GetServerSideProps<CatalogPageProps> = async (
     "populate[default_circle][populate][images][fields][0]",
     "url",
   );
+  tasteParams.set("populate[author][fields][0]", "company");
   tasteParams.set("sort[0]", "name:ASC");
   tasteParams.set("pagination[pageSize]", "2000");
+
+  const brandParams = new URLSearchParams({
+    "populate[logo][fields][0]": "url",
+    "populate[logo][fields][1]": "formats",
+    "populate[author][fields][0]": "company",
+    "sort[0]": "name:ASC",
+    "pagination[pageSize]": "2000",
+  });
+  // Only shared/root assets and this cabinet's own assets belong in its catalog.
+  for (const params of [tasteParams, brandParams]) {
+    addCatalogVisibilityFilters(params, result.session.client.id);
+  }
 
   const circleParams = new URLSearchParams();
   circleParams.set("fields[0]", "name");
@@ -479,13 +525,15 @@ export const getServerSideProps: GetServerSideProps<CatalogPageProps> = async (
     );
 
   let tastes: PortalTaste[] = [];
+  let brands: PortalBrand[] = [];
   let circles: PortalCircle[] = [];
   let splashes: PortalSplash[] = [];
   try {
-    [tastes, circles, splashes] = await Promise.all([
+    [tastes, brands, circles, splashes] = await Promise.all([
       requestStrapiRestAsService<PortalTaste[]>(
         `/api/tastes?${tasteParams.toString()}`,
       ),
+      requestStrapiRestAsService<PortalBrand[]>(`/api/brands?${brandParams.toString()}`),
       requestStrapiRestAsService<PortalCircle[]>(
         `/api/circles?${circleParams.toString()}`,
       ),
@@ -502,5 +550,5 @@ export const getServerSideProps: GetServerSideProps<CatalogPageProps> = async (
     console.error("[catalog] catalog loading failed:", error);
   }
 
-  return { props: { session: result.session, tastes, circles, splashes } };
+  return { props: { session: result.session, tastes, brands, circles, splashes } };
 };
