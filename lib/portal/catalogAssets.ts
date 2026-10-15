@@ -11,7 +11,7 @@ export type CatalogAuthor = { id: string | number; company?: string | null };
 export const canManageCatalogAsset = (
   author: CatalogAuthor | null | undefined,
   clientId: string | number,
-) => Boolean(author?.id && author.company?.trim().toLowerCase() !== "root" && String(author.id) === String(clientId));
+) => Boolean(author?.id && author.company?.trim() && author.company.trim().toLowerCase() !== "root" && String(author.id) === String(clientId));
 
 export function addCatalogVisibilityFilters(params: URLSearchParams, clientId: string | number) {
   params.set("filters[$or][0][author][id][$null]", "true");

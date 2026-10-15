@@ -1,4 +1,4 @@
-import { Alert, AlertIcon, AspectRatio, Badge, Box, Button, Heading, Image, SimpleGrid, Text, VStack } from "@chakra-ui/react";
+import { Alert, AlertIcon, AspectRatio, Box, Button, Heading, Image, SimpleGrid, Text, VStack } from "@chakra-ui/react";
 import { useRouter } from "next/router";
 import { useState } from "react";
 import { canManageCatalogAsset } from "../../../lib/portal/catalogAssets";
@@ -45,8 +45,6 @@ export function CatalogCollections({ tastes, brands, clientId }: Props) {
                   </AspectRatio>
                   <VStack p="4" spacing="2" align="stretch">
                     <Text color="bg.50" fontWeight="800">{item.name}</Text>
-                    {"submission_status" in item && item.submission_status === "pending" ? <Badge colorScheme="yellow" alignSelf="flex-start">Pending review</Badge> : null}
-                    {"submission_status" in item && item.submission_status === "rejected" ? <Badge colorScheme="red" alignSelf="flex-start">Rejected</Badge> : null}
                     {owned ? <Button type="button" size="sm" colorScheme="red" variant="outline" aria-label={`Delete ${item.name}`} isLoading={deleting === `${collection}/${item.id}`} isDisabled={Boolean(deleting)} onClick={() => remove(collection, item.id)}>Delete</Button> : null}
                   </VStack>
                 </Box>

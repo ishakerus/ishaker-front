@@ -1,3 +1,4 @@
+import { requestVisibleCatalogAssets } from "../../../lib/portal/catalogOwnership";
 import { addCatalogVisibilityFilters } from "../../../lib/portal/catalogAssets";
 import { withSupportPortalApi } from "../../../lib/admin/access";
 import type { NextApiRequest, NextApiResponse } from "next";
@@ -70,7 +71,9 @@ async function handler(
       params.set("populate[main][fields][0]", "url");
       params.set("populate[main][fields][1]", "formats");
       params.set("sort[0]", "name:ASC");
-      const tastes = await loadAllPages<PortalTaste>("/api/tastes", params);
+      const tastes = await requestVisibleCatalogAssets(params, session.client.id,
+        (query) => requestStrapiRestAsService<PortalTaste[]>(`/api/tastes?${query}`),
+      );
       return res.status(200).json({ tastes });
     }
     return res.status(400).json({ error: "invalid_visual_option_type" });

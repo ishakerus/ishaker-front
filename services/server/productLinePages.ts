@@ -1,3 +1,4 @@
+import { requestVisibleCatalogAssets } from "../../lib/portal/catalogOwnership";
 import { addCatalogVisibilityFilters } from "../../lib/portal/catalogAssets";
 import { requestWithSplashOwnershipFallback } from "../../lib/portal/splashOwnership";
 import type {
@@ -608,13 +609,17 @@ export const loadProductEditorPage = async (
         `/api/circles?${circleParams.toString()}`,
       ),
     ),
-    requestStrapiRestAsService<PortalTaste[]>(`/api/tastes?${tasteParams.toString()}`),
+    requestVisibleCatalogAssets(tasteParams, session.client.id,
+      (query) => requestStrapiRestAsService<PortalTaste[]>(`/api/tastes?${query}`),
+    ),
     cachedReference("product-editor:components", () =>
       requestStrapiRestAsService<PortalComponent[]>(
         `/api/components?${componentParams.toString()}`,
       ),
     ),
-    requestStrapiRestAsService<PortalBrand[]>(`/api/brands?${brandParams.toString()}`),
+    requestVisibleCatalogAssets(brandParams, session.client.id,
+      (query) => requestStrapiRestAsService<PortalBrand[]>(`/api/brands?${query}`),
+    ),
     cachedReference("product-editor:currencies", () =>
       requestStrapiRestAsService<Currency[]>(
         `/api/currencies?${currencyParams.toString()}`,

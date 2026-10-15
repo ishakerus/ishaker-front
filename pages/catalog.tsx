@@ -28,6 +28,8 @@ import { addCatalogVisibilityFilters, validateCatalogFile } from "../lib/portal/
 import { PortalShell } from "../components/portal/PortalShell";
 import { SearchableImageSelect } from "../components/portal/product-lines/SearchableImageSelect";
 import { TasteMainPreview } from "../components/portal/product-lines/new-product/TasteMainPreview";
+import { requestVisibleCatalogAssets } from "../lib/portal/catalogOwnership";
+import { loadCatalogCollections } from "../lib/portal/loadCatalogCollections";
 import { requirePortalSession } from "../lib/portal/auth";
 import {
   generateSplashInBrowser,
@@ -54,6 +56,7 @@ type CatalogPageProps = {
   brands: PortalBrand[];
   circles: PortalCircle[];
   splashes: PortalSplash[];
+  loadErrors: string[];
 };
 
 type EncodedFile = { name: string; type: string; data: string };
@@ -98,6 +101,7 @@ export default function CatalogPage({
   brands = [],
   circles = [],
   splashes = [],
+  loadErrors = [],
 }: CatalogPageProps) {
   const [name, setName] = useState("");
   const [main, setMain] = useState<File | null>(null);
@@ -164,7 +168,7 @@ export default function CatalogPage({
       setGeneratedPreview(
         `data:image/png;base64,${frames[frames.length - 1]?.data || ""}`,
       );
-      setMessage("Custom splash generated. Review the preview, then submit.");
+      setMessage("Custom splash generated. Check the preview, then create your taste.");
     } catch (error) {
       setIsError(true);
       setMessage(
@@ -204,7 +208,7 @@ export default function CatalogPage({
         throw new Error(payload?.message || "Submission failed.");
 
       setMessage(
-        "Custom taste submitted for review. It is not live on machines yet.",
+        "Custom taste created. It is available in your catalog and product editor now.",
       );
       setName("");
       setMain(null);
@@ -213,9 +217,8 @@ export default function CatalogPage({
       setElements([]);
       clearGeneratedSplash();
       form.reset();
-      // Re-run getServerSideProps so the new taste shows up in the
-      // grid with its "Pending review" badge. A failed refresh must not
-      // turn a successful submission into an error message.
+      // Refresh the catalog after creation. A failed refresh must not
+      // turn a successful creation into an error message.
       await router
         .replace(router.asPath, undefined, { scroll: false })
         .catch(() => undefined);
@@ -233,6 +236,12 @@ export default function CatalogPage({
       description="Create and manage your tastes and brands, or browse shared catalog items."
       clientName={session.client.company}
     >
+      {loadErrors.length ? (
+        <Alert status="warning" borderRadius="xl" my="4">
+          <AlertIcon />
+          Could not load {loadErrors.join(", ")}. Please try again later. Other available catalog options are shown below.
+        </Alert>
+      ) : null}
       <Box
         as="form"
         onSubmit={submit}
@@ -248,10 +257,6 @@ export default function CatalogPage({
           <Box>
             <Text color="bg.50" fontSize="2xl" fontWeight="800">
               Add a custom taste
-            </Text>
-            <Text color="bg.300" mt="1">
-              Your submission stays hidden until the iShaker team reviews and
-              approves it.
             </Text>
             <Link as={NextLink} href="/articles/create-taste" color="acid.300">How to create a taste</Link>
           </Box>
@@ -413,7 +418,7 @@ export default function CatalogPage({
                   generatedFrames.length !== 20
                 }
               >
-                Submit custom taste
+                Create taste
               </Button>
             </VStack>
 
@@ -524,31 +529,26 @@ export const getServerSideProps: GetServerSideProps<CatalogPageProps> = async (
       `/api/splashes?${params.toString()}`,
     );
 
-  let tastes: PortalTaste[] = [];
-  let brands: PortalBrand[] = [];
-  let circles: PortalCircle[] = [];
-  let splashes: PortalSplash[] = [];
-  try {
-    [tastes, brands, circles, splashes] = await Promise.all([
-      requestStrapiRestAsService<PortalTaste[]>(
-        `/api/tastes?${tasteParams.toString()}`,
+  const collections = await loadCatalogCollections({
+    tastes: () => requestVisibleCatalogAssets(tasteParams, result.session.client.id,
+      (query) => requestStrapiRestAsService<PortalTaste[]>(`/api/tastes?${query}`),
+    ),
+    brands: () => requestVisibleCatalogAssets(brandParams, result.session.client.id,
+      (query) => requestStrapiRestAsService<PortalBrand[]>(`/api/brands?${query}`),
+    ),
+    circles: () => requestStrapiRestAsService<PortalCircle[]>(
+      `/api/circles?${circleParams.toString()}`,
+    ),
+    splashes: () => requestWithSplashOwnershipFallback(
+      splashParams,
+      loadSplashes,
+      () => console.warn(
+        "[catalog] splash ownership filtering is unsupported; using the compatible query.",
       ),
-      requestStrapiRestAsService<PortalBrand[]>(`/api/brands?${brandParams.toString()}`),
-      requestStrapiRestAsService<PortalCircle[]>(
-        `/api/circles?${circleParams.toString()}`,
-      ),
-      requestWithSplashOwnershipFallback(
-        splashParams,
-        loadSplashes,
-        () =>
-          console.warn(
-            "[catalog] splash ownership filtering is unsupported; using the compatible query.",
-          ),
-      ),
-    ]);
-  } catch (error) {
-    console.error("[catalog] catalog loading failed:", error);
-  }
+    ),
+  }, (name, error) => {
+    console.error(`[catalog] ${name} loading failed:`, error);
+  });
 
-  return { props: { session: result.session, tastes, brands, circles, splashes } };
+  return { props: { session: result.session, ...collections } };
 };

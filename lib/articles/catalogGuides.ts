@@ -68,9 +68,9 @@ The form rejects files with the wrong extension, image format, dimensions, or fi
 5. Choose an existing **Base color splash** that matches your ingredients. The selector shows its final animation frame.
 6. Select **exactly five 500 × 500 px ingredient PNGs** together in the ingredient file picker.
 7. Click **Generate splash**. Review the resulting 20-frame animation and the smaller main-image preview beneath it. If you change the name, base splash, or ingredients, generate the splash again.
-8. Click **Submit custom taste** when the previews are ready.
+8. Click **Create taste** when the previews are ready.
 
-The taste appears under **Your tastes** with a **Pending review** badge. Submission does not make it live on machines: the iShaker team must review and approve it first.
+The taste is available immediately in your catalog and product editor. Select it when configuring a product; creating the taste does not automatically change the products already assigned to a machine.
 
 ## Manage your tastes
 
