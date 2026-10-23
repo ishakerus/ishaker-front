@@ -7,6 +7,7 @@ test("expired-machine write targets come from the URL, independent of browser ma
   assert.deepEqual(subscriptionWriteTarget("PUT", "/api/portal/machines/118/cells", { machineId: 125 }), { kind: "machine", id: "118" });
   assert.deepEqual(subscriptionWriteTarget("PUT", "/api/portal/machines/118/free-mode", { enabled: true }), { kind: "machine", id: "118" });
   assert.deepEqual(subscriptionWriteTarget("PATCH", "/api/portal/product-lines/3", {}), { kind: "line", id: "3" });
+  assert.deepEqual(subscriptionWriteTarget("POST", "/api/portal/promos", { machineId: 118 }), { kind: "machine", id: "118" });
 });
 
 test("billing, support, history, door access, inventory and disabling free mode stay available", () => {

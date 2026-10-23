@@ -76,7 +76,7 @@ export default function BillingPage({ session }: { session: PortalSession }) {
       <HStack justify="space-between" mb="6" flexWrap="wrap" gap="3">
         <Box><Heading size="lg">Subscriptions & payments</Heading><Text mt="2" color="whiteAlpha.700">Service for your machines, billed every 30 days.</Text></Box>
         <HStack>
-          <Badge colorScheme={billing?.stripe.test_mode === false ? "green" : "purple"}>{billing?.stripe.test_mode === false ? "Live billing" : "Stripe test mode"}</Badge>
+          <Badge colorScheme={billing?.stripe.test_mode === false ? "green" : "purple"}>{billing ? (billing.stripe.test_mode ? "Stripe test mode" : "Live billing") : "Billing"}</Badge>
           <Button size="sm" isDisabled={!billing?.stripe.enabled || !billing.stripe.linked || Boolean(busy)} isLoading={busy === "sync"} onClick={() => void action("sync")}>Refresh payments</Button>
           <Button size="sm" isDisabled={!billing?.stripe.enabled || !billing.stripe.linked || Boolean(busy)} isLoading={busy === "portal"} onClick={() => void action("portal")}>Manage billing</Button>
         </HStack>

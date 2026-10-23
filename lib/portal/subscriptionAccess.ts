@@ -21,7 +21,8 @@ export function subscriptionWriteTarget(method: string, path: string, body: any)
   const promo = path.match(/^\/api\/portal\/promos\/(\d+)$/);
   if (promo && method !== "DELETE" && body?.isActive !== false) return { kind: "promo", id: promo[1] };
   if (path === "/api/portal/promos" && method === "POST") {
-    return typeof body?.machineId === "string" && /^\d+$/.test(body.machineId) ? { kind: "machine", id: body.machineId } : { kind: "fleet" };
+    const machineId = typeof body?.machineId === "string" || typeof body?.machineId === "number" ? String(body.machineId) : "";
+    return /^\d+$/.test(machineId) ? { kind: "machine", id: machineId } : { kind: "fleet" };
   }
   if (["/api/portal/product-lines", "/api/portal/product-lines/editor", "/api/portal/nayax-settings"].includes(path)) return { kind: "fleet" };
   return null;
