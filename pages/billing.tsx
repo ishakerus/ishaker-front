@@ -85,6 +85,7 @@ export default function BillingPage({ session }: { session: PortalSession }) {
       {router.query.checkout === "success" ? <Alert status="info" mb="5" borderRadius="lg"><AlertIcon />Checkout completed. Payment is confirmed from Stripe; refresh payments if your status is still pending.</Alert> : null}
       {router.query.checkout === "canceled" ? <Alert status="info" mb="5" borderRadius="lg"><AlertIcon />Checkout was canceled. You can resume it below.</Alert> : null}
       {billing && !billing.stripe.enabled ? <Alert status="info" mb="5" borderRadius="lg"><AlertIcon />Payments are not enabled for this account yet. Contact support to set up billing.</Alert> : null}
+      {billing?.stripe.enabled && billing.subscriptions.some((sub) => !["active", "orange", "red"].includes(sub.status)) ? <Alert status="warning" mb="5" borderRadius="lg"><AlertIcon />Machines without paid access have restricted configuration, product deployments, promotions, and free mode. Billing, support, sales history, and service controls remain available.</Alert> : null}
       {!billing && !error ? <Text py="8">Loading billing…</Text> : null}
       {billing ? <>
         <SimpleGrid columns={{ base: 1, md: 3 }} spacing="4" mb="8">
