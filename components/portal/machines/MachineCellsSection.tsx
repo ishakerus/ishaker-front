@@ -348,6 +348,8 @@ export function MachineCellsSection({
       ) as PortalMachineCell[];
       setCells(buildDrafts(refreshed, containerCount));
       onCellsSaved?.(refreshed);
+      const updateNotice =
+        "Changes will be applied within 2–5 minutes if the machine is online.";
       toast(
         emptyAssignedContainers.length
           ? {
@@ -357,13 +359,14 @@ export function MachineCellsSection({
                   : `Containers ${emptyAssignedContainers
                       .map((cell) => cell.position)
                       .join(", ")} have products but are empty.`,
-              description: "Click on container to set powder volume",
+              description: `Click on the container to set the powder volume. ${updateNotice}`,
               status: "warning",
               duration: 7000,
               isClosable: true,
             }
           : {
               title: "Container assignments saved",
+              description: updateNotice,
               status: "success",
               duration: 5000,
               isClosable: true,
