@@ -19,6 +19,7 @@ async function submitProduct(
     ownsLine?: boolean;
     ownsProduct?: boolean;
     duplicate?: boolean;
+    existingMode?: boolean | null;
   } = {},
 ) {
   const writes: Array<{ path: string; method: string; data: any }> = [];
@@ -72,8 +73,17 @@ async function submitProduct(
       }
       if (url.pathname === "/api/brands/2") return json({ data: { id: 2 } });
       if (url.pathname === "/api/products") {
+        const addonOnly = url.searchParams.get("filters[is_dependent][$eq]") === "true";
+        if (body.isDependent === true) {
+          assert.equal(addonOnly, true);
+        } else {
+          assert.equal(url.searchParams.get("filters[$or][0][is_dependent][$eq]"), "false");
+          assert.equal(url.searchParams.get("filters[$or][1][is_dependent][$null]"), "true");
+        }
+        const matchesMode = options.existingMode !== undefined &&
+          (options.existingMode === true) === addonOnly;
         return json({
-          data: options.duplicate ? [{ id: 8, name: "Creatine" }] : [],
+          data: options.duplicate || matchesMode ? [{ id: 8, name: "Creatine" }] : [],
         });
       }
       if (url.pathname === "/api/products/7") {
@@ -151,6 +161,26 @@ test("creates an add-on with only name, brand, one dosage and price", async (t) 
     ),
     false,
   );
+});
+
+test("add-on names accept 20 characters and reject 21 on create and edit", async (t) => {
+  for (const method of ["POST", "PUT"]) {
+    for (const length of [20, 21]) {
+      await t.test(`${method} ${length} characters`, async (subtest) => {
+        const result = await submitProduct(subtest, {
+          ...addon,
+          name: "A".repeat(length),
+          ...(method === "PUT" ? { existingProductId: "7" } : {}),
+        }, { method });
+        assert.equal(result.statusCode, length === 21 ? 400 : method === "PUT" ? 200 : 201);
+        if (length === 21) {
+          assert.equal(result.payload.error, "invalid_name");
+          assert.match(result.payload.message, /20 characters/);
+          assert.equal(result.writes.length, 0);
+        }
+      });
+    }
+  }
 });
 
 test("editing an add-on preserves its calibration and existing mix targets", async (t) => {
@@ -302,6 +332,27 @@ const drink = {
     conversionFactor: 4,
   },
 };
+
+test("a drink and add-on may share a name within one product line", async (t) => {
+  for (const [body, existingMode] of [[addon, false], [addon, null], [drink, true]] as const) {
+    await t.test(`saving ${body.isDependent ? "add-on" : "drink"} beside ${existingMode}`, async (subtest) => {
+      const result = await submitProduct(subtest, body, { existingMode });
+      assert.equal(result.statusCode, 201);
+      assert.equal(result.writes.length, 1);
+    });
+  }
+});
+
+test("same-mode names remain unique, including legacy drinks without a mode", async (t) => {
+  for (const [body, existingMode] of [[addon, true], [drink, false], [drink, null]] as const) {
+    await t.test(`saving ${body.isDependent ? "add-on" : "drink"} beside ${existingMode}`, async (subtest) => {
+      const result = await submitProduct(subtest, body, { existingMode });
+      assert.equal(result.statusCode, 409);
+      assert.equal(result.payload.error, "duplicate_name");
+      assert.equal(result.writes.length, 0);
+    });
+  }
+});
 
 test("drinks still require artwork and valid water amounts", async (t) => {
   await t.test("artwork", async (subtest) => {

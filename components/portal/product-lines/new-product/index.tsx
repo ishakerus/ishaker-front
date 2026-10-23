@@ -11,6 +11,10 @@ import { FormEvent, useEffect, useMemo, useRef, useState } from "react";
 import useSWR from "swr";
 import { capitalizeName } from "../../../../lib/formatName";
 import {
+  ADDON_NAME_MAX_LENGTH,
+  getDefaultAddonName,
+} from "../../../../lib/portal/addonName";
+import {
   ADDON_PRICE_ERROR,
   isValidAddonPrice,
 } from "../../../../lib/portal/addonPrice";
@@ -265,12 +269,27 @@ export function NewProductPage({
   const initialProduct = editingProduct || undefined;
   const isEditing = Boolean(initialProduct);
   const editingProductId = initialProduct ? String(initialProduct.id) : "";
-  const [brandId, setBrandId] = useState(
-    initialProduct?.brand?.id ? String(initialProduct.brand.id) : "",
+  const initiallyAddon = initialProduct?.is_dependent === true;
+  const initialBrandId = initialProduct?.brand?.id ? String(initialProduct.brand.id) : "";
+  const [isDependent, setIsDependent] = useState(initiallyAddon);
+  const [drinkBrandId, setDrinkBrandId] = useState(
+    initiallyAddon ? "" : initialBrandId,
   );
-  const [name, setName] = useState(
-    initialProduct ? capitalizeName(initialProduct.name) : "",
+  const [addonBrandId, setAddonBrandId] = useState(
+    initiallyAddon ? initialBrandId : "",
   );
+  const [drinkName, setDrinkName] = useState(
+    initialProduct && !initiallyAddon ? capitalizeName(initialProduct.name) : "",
+  );
+  const [addonName, setAddonName] = useState(
+    initiallyAddon
+      ? capitalizeName(initialProduct.name)
+      : getDefaultAddonName(productLine.name),
+  );
+  const name = isDependent ? addonName : drinkName;
+  const setName = isDependent ? setAddonName : setDrinkName;
+  const brandId = isDependent ? addonBrandId : drinkBrandId;
+  const setBrandId = isDependent ? setAddonBrandId : setDrinkBrandId;
   const [existingProductId, setExistingProductId] = useState(editingProductId);
   const [splashId, setSplashId] = useState(
     initialProduct?.custom_splash?.id
@@ -325,9 +344,6 @@ export function NewProductPage({
     initialProduct?.serving_unit === "ml" ? "ml" : "g",
   );
   const [isSubmitting, setIsSubmitting] = useState(false);
-  const [isDependent, setIsDependent] = useState(
-    initialProduct?.is_dependent === true,
-  );
   const [addonDosage, setAddonDosage] = useState(
     initialProduct?.is_dependent && initialProduct.dosage?.product != null
       ? String(initialProduct.dosage.product)
@@ -338,11 +354,18 @@ export function NewProductPage({
       ? String(initialProduct.dosage.full_drink_price)
       : "",
   );
-  const [canBeAddedToIds, setCanBeAddedToIds] = useState(
-    (initialProduct?.can_be_added_to || []).map((product) =>
+  const [drinkMixTargets, setDrinkMixTargets] = useState(
+    (!initiallyAddon ? initialProduct?.can_be_added_to || [] : []).map((product) =>
       String(product.id),
     ),
   );
+  const [addonMixTargets, setAddonMixTargets] = useState(
+    (initiallyAddon ? initialProduct?.can_be_added_to || [] : []).map((product) =>
+      String(product.id),
+    ),
+  );
+  const canBeAddedToIds = isDependent ? addonMixTargets : drinkMixTargets;
+  const setCanBeAddedToIds = isDependent ? setAddonMixTargets : setDrinkMixTargets;
   const [error, setError] = useState("");
   const hydratedProductDetailsId = useRef(
     initialProduct?.components !== undefined &&
@@ -610,8 +633,9 @@ export function NewProductPage({
     );
   const validationMessage = (() => {
     if (!brandId) return "Select a brand.";
-    if (name.trim().length < 2 || name.trim().length > 100) {
-      return "Select or enter a product name between 2 and 100 characters.";
+    const maxNameLength = isDependent ? ADDON_NAME_MAX_LENGTH : 100;
+    if (name.trim().length < 2 || name.trim().length > maxNameLength) {
+      return `Select or enter a product name between 2 and ${maxNameLength} characters.`;
     }
     if (isDependent) {
       if (!Number.isFinite(Number(addonDosage)) || Number(addonDosage) <= 0) {
@@ -896,7 +920,8 @@ export function NewProductPage({
           name={name}
           onBrandChange={(value) => {
             setBrandId(value);
-            if (!isEditing) {
+            setError("");
+            if (!isEditing && !isDependent) {
               setName("");
               resetProductVisuals();
             }
@@ -916,7 +941,8 @@ export function NewProductPage({
           }}
           onNameChange={(value) => {
             setName(value);
-            if (!isEditing) resetProductVisuals();
+            setError("");
+            if (!isEditing && !isDependent) resetProductVisuals();
           }}
           onProductSelect={selectProduct}
           onProductPurposeChange={setProductPurpose}

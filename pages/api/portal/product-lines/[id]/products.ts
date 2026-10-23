@@ -1,6 +1,7 @@
 import { withSupportPortalApi } from "../../../../../lib/admin/access";
 import type { NextApiRequest, NextApiResponse } from "next";
 import { capitalizeName } from "../../../../../lib/formatName";
+import { ADDON_NAME_MAX_LENGTH } from "../../../../../lib/portal/addonName";
 import {
   ADDON_PRICE_ERROR,
   isValidAddonPrice,
@@ -358,10 +359,11 @@ export async function handler(req: NextApiRequest, res: NextApiResponse) {
       }
     }
   }
-  if (name.length < 2 || name.length > 100) {
+  const maxNameLength = isDependent ? ADDON_NAME_MAX_LENGTH : 100;
+  if (name.length < 2 || name.length > maxNameLength) {
     return res.status(400).json({
       error: "invalid_name",
-      message: "Name must contain between 2 and 100 characters.",
+      message: `Name must contain between 2 and ${maxNameLength} characters.`,
     });
   }
   if (!isDependent && description.length > 2000) {
@@ -476,6 +478,12 @@ export async function handler(req: NextApiRequest, res: NextApiResponse) {
     const duplicateNameParams = new URLSearchParams();
     duplicateNameParams.set("filters[name][$eqi]", name);
     duplicateNameParams.set("filters[product_line][id][$eq]", productLineId);
+    if (isDependent) {
+      duplicateNameParams.set("filters[is_dependent][$eq]", "true");
+    } else {
+      duplicateNameParams.set("filters[$or][0][is_dependent][$eq]", "false");
+      duplicateNameParams.set("filters[$or][1][is_dependent][$null]", "true");
+    }
     if (isEditing && existingProductId) {
       duplicateNameParams.set("filters[id][$ne]", existingProductId);
     }
@@ -507,7 +515,7 @@ export async function handler(req: NextApiRequest, res: NextApiResponse) {
         return res.status(409).json({
           error: "duplicate_name",
           message:
-            "A product with this name already exists in this product line.",
+            "An add-on with this name already exists in this product line. Edit it or choose another name.",
         });
       }
       if (isEditing && !existingProduct?.id) {
@@ -686,7 +694,7 @@ export async function handler(req: NextApiRequest, res: NextApiResponse) {
       return res.status(409).json({
         error: "duplicate_name",
         message:
-          "A product with this name already exists in this product line.",
+          "A drink with this name already exists in this product line. Edit it or choose another name.",
       });
     }
 

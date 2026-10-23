@@ -8,6 +8,7 @@ import {
   NumberInputField,
   Text,
 } from "@chakra-ui/react";
+import { ADDON_NAME_MAX_LENGTH } from "../../../../lib/portal/addonName";
 import {
   SearchableImageSelect,
   type SearchableImageOption,
@@ -59,10 +60,11 @@ export function AddonProductFields({
           value={name}
           onChange={(event) => onNameChange(event.target.value)}
           minLength={2}
-          maxLength={100}
+          maxLength={ADDON_NAME_MAX_LENGTH}
           placeholder="e.g. Creatine"
           bg="bg.800"
         />
+        <FormHelperText>Maximum {ADDON_NAME_MAX_LENGTH} characters.</FormHelperText>
       </FormControl>
 
       <FormControl isRequired>
