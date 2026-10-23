@@ -20,6 +20,8 @@ async function submitProduct(
     ownsProduct?: boolean;
     duplicate?: boolean;
     existingMode?: boolean | null;
+    existingOwner?: "unowned" | "another_client";
+    clientAccess?: boolean;
   } = {},
 ) {
   const writes: Array<{ path: string; method: string; data: any }> = [];
@@ -52,7 +54,9 @@ async function submitProduct(
       }
       reads.push(url.pathname);
       if (url.pathname === "/api/product-lines") {
-        assert.equal(url.searchParams.get("filters[author][id][$eq]"), "11");
+        assert.equal(url.searchParams.get(options.clientAccess
+          ? "filters[author][client][id][$eq]"
+          : "filters[author][id][$eq]"), options.clientAccess ? "30" : "11");
         return json({
           data:
             options.ownsLine === false
@@ -73,6 +77,10 @@ async function submitProduct(
       }
       if (url.pathname === "/api/brands/2") return json({ data: { id: 2 } });
       if (url.pathname === "/api/products") {
+        const ownerScope = url.searchParams.get(options.clientAccess
+          ? "filters[author][client][id][$eq]"
+          : "filters[author][id][$eq]");
+        assert.equal(ownerScope, options.clientAccess ? "30" : "11");
         const addonOnly = url.searchParams.get("filters[is_dependent][$eq]") === "true";
         if (body.isDependent === true) {
           assert.equal(addonOnly, true);
@@ -82,8 +90,9 @@ async function submitProduct(
         }
         const matchesMode = options.existingMode !== undefined &&
           (options.existingMode === true) === addonOnly;
+        const hiddenDuplicate = options.existingOwner && !ownerScope;
         return json({
-          data: options.duplicate || matchesMode ? [{ id: 8, name: "Creatine" }] : [],
+          data: options.duplicate || matchesMode || hiddenDuplicate ? [{ id: 8, name: "Creatine" }] : [],
         });
       }
       if (url.pathname === "/api/products/7") {
@@ -131,8 +140,8 @@ async function submitProduct(
       updatedAt: "",
       portalSession: {
         user: { id: 11, email: "product@example.test" },
-        client: { id: 0, company: "Test" },
-        access: "product",
+        client: { id: options.clientAccess ? 30 : 0, company: "Test" },
+        access: options.clientAccess ? "client" : "product",
         machines: [],
       },
     },
@@ -161,6 +170,25 @@ test("creates an add-on with only name, brand, one dosage and price", async (t) 
     ),
     false,
   );
+});
+
+test("hidden unowned or foreign products do not block an add-on in the user's library", async (t) => {
+  for (const clientAccess of [true, false]) {
+    for (const existingOwner of ["unowned", "another_client"] as const) {
+      await t.test(`${clientAccess ? "client" : "product"} access, ${existingOwner}`, async (subtest) => {
+        const result = await submitProduct(subtest, addon, { existingOwner, clientAccess });
+        assert.equal(result.statusCode, 201);
+        assert.equal(result.writes.length, 1);
+        assert.equal(result.writes[0].data.author, 11);
+      });
+    }
+  }
+});
+
+test("a visible same-name add-on still blocks duplicates for client accounts", async (t) => {
+  const result = await submitProduct(t, addon, { duplicate: true, clientAccess: true });
+  assert.equal(result.statusCode, 409);
+  assert.equal(result.writes.length, 0);
 });
 
 test("add-on names accept 20 characters and reject 21 on create and edit", async (t) => {

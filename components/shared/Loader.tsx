@@ -1,10 +1,23 @@
-import { Box, BoxProps } from "@chakra-ui/react";
+import { Box, BoxProps, Spinner } from "@chakra-ui/react";
 import dynamic from "next/dynamic";
+
+function LoaderFallback() {
+  return (
+    <Box w="full" h="full" display="flex" alignItems="center" justifyContent="center">
+      <Spinner w="33.333%" h="33.333%" color="acid.300" thickness="2px" />
+    </Box>
+  );
+}
 
 const DotLottieReact = dynamic(
   () =>
-    import("@lottiefiles/dotlottie-react").then((mod) => mod.DotLottieReact),
-  { ssr: false },
+    import("@lottiefiles/dotlottie-react")
+      .then((mod) => {
+        mod.setWasmUrl("/dotlottie-player.wasm");
+        return mod.DotLottieReact;
+      })
+      .catch(() => LoaderFallback),
+  { ssr: false, loading: LoaderFallback },
 );
 
 const sizeMap = {

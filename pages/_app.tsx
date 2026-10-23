@@ -5,7 +5,6 @@ import { ChakraProvider } from "@chakra-ui/react";
 import { DefaultSeo } from "next-seo";
 import Head from "next/head";
 import { Provider } from "react-redux";
-import { useEffect } from "react";
 import theme from "../styles/theme";
 import store from "../redux/store";
 import { Footer } from "../components/Footer";
@@ -13,18 +12,6 @@ import RouteLoadingOverlay from "../components/shared/RouteLoadingOverlay";
 import { CustomDialogProvider } from "../components/shared/CustomDialog";
 
 function MyApp({ Component, pageProps }: AppProps) {
-  useEffect(() => {
-    import("@lottiefiles/dotlottie-react")
-      .then(({ setWasmUrl }) => {
-        setWasmUrl("/dotlottie-player.wasm");
-      })
-      .catch((error) => {
-        // Animations are decorative. A stale optional chunk should never take
-        // down the whole application while Next rebuilds in development.
-        console.warn("[iShaker] Lottie initialization skipped:", error);
-      });
-  }, []);
-
   return (
     <>
       <Head>

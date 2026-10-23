@@ -478,6 +478,13 @@ export async function handler(req: NextApiRequest, res: NextApiResponse) {
     const duplicateNameParams = new URLSearchParams();
     duplicateNameParams.set("filters[name][$eqi]", name);
     duplicateNameParams.set("filters[product_line][id][$eq]", productLineId);
+    // Match the visible library's ownership scope. Legacy unowned rows and
+    // other clients' records must not block creating a product in this library.
+    if (session.access === "client") {
+      duplicateNameParams.set("filters[author][client][id][$eq]", String(session.client.id));
+    } else {
+      duplicateNameParams.set("filters[author][id][$eq]", String(session.user.id));
+    }
     if (isDependent) {
       duplicateNameParams.set("filters[is_dependent][$eq]", "true");
     } else {
