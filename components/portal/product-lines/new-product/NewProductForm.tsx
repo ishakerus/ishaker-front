@@ -364,6 +364,12 @@ export function NewProductForm({
             Choose eligible drinks from your library. Both products must be in
             active containers on the same machine for the mix to be available.
           </FormHelperText>
+          {!isDependent ? (
+            <FormHelperText>
+              Drink-to-drink mixes use the full size. The kiosk hides the base
+              drink’s small size while such a mix is available on that machine.
+            </FormHelperText>
+          ) : null}
           {mixPreview.length ? (
             <Box mt="3" bg="whiteAlpha.50" borderRadius="lg" p="3">
               <Text color="bg.200" fontSize="sm" fontWeight="700" mb="1">

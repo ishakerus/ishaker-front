@@ -524,21 +524,16 @@ export function NewProductPage({
       candidate.product_line?.base_product_line?.id || candidate.product_line?.id;
     const isExcluded = blockedLineIds.has(String(candidateRootLineId));
     const isSelected = canBeAddedToIds.includes(String(candidate.id));
-    const hasReversePair = (candidate.can_be_added_to || []).some(
-      (target) => String(target.id) === editingProductId,
-    );
     const note = isExcluded
       ? "Excluded by product-line rules — remove this pairing."
-      : hasReversePair
-        ? "already added to this one"
-        : candidate.product_line?.name
-          ? capitalizeName(candidate.product_line.name)
-          : undefined;
+      : candidate.product_line?.name
+        ? capitalizeName(candidate.product_line.name)
+        : undefined;
     return {
       id: String(candidate.id),
       label: capitalizeName(candidate.name),
       ...(note ? { note } : {}),
-      isDisabled: (isExcluded || hasReversePair) && !isSelected,
+      isDisabled: isExcluded && !isSelected,
     };
   });
   const mixPreview = canBeAddedToIds.flatMap((targetId) => {

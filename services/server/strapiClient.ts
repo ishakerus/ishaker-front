@@ -19,6 +19,8 @@ let loginPromise: Promise<string> | null = null;
 
 const readLocalStrapiEnv = () => {
   if (process.env.NODE_ENV === "production") return {};
+  const hostname = new URL(getStrapiBaseUrl()).hostname;
+  if (!["localhost", "127.0.0.1", "[::1]"].includes(hostname)) return {};
 
   try {
     const envPath = path.resolve(process.cwd(), "../strapi/.env");

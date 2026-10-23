@@ -1,9 +1,6 @@
 import normalize from "./normalizer";
 
-const DEFAULT_STRAPI_URL =
-  process.env.NODE_ENV === "production"
-    ? "https://admin.ishaker.xyz"
-    : "http://localhost:1337";
+const DEFAULT_STRAPI_URL = "https://admin.ishaker.xyz";
 
 const unwrap = (data: any) => {
   if (

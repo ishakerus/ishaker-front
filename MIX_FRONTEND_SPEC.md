@@ -4,6 +4,8 @@
 > `product-line.cannot_be_added_to` exclusions. The allowlist descriptions below
 > are historical, as are the base-price-only assumptions for add-ons. Add-on
 > prices now use `dosage.full_drink_price` and require kiosk patch 82 or later.
+> Ordinary drink pairs may be selected in both directions. Available
+> drink-to-drink mixes use the full size only; saved small-cup settings remain.
 > See [the current mixing rules](../strapi/docs/mixing.md).
 
 ## Goal
