@@ -207,6 +207,7 @@ export type Client = {
   company: string;
   portal_email?: string | null;
   portal_access_enabled?: boolean;
+  subscription_billing_enabled?: boolean;
   portal_auth_provider?: "local" | "google" | "apple" | "facebook";
   country?: string;
   state?: string;

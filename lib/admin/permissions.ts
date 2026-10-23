@@ -17,6 +17,7 @@ const deletableCollections = new Set([
 export const canSupportWriteStrapi = (path: string, method: string) => {
   const pathname = path.split("?")[0];
   if (pathname === "/api/upload") return method === "POST";
+  if (/^\/api\/client-billing\/\d+\/(checkout|portal|sync)$/.test(pathname)) return method === "POST";
   if (/^\/api\/machines\/\d+\/free-mode$/.test(pathname)) return method === "PUT";
   if (/^\/api\/machines\/\d+\/apply-preset$/.test(pathname)) return method === "POST";
   const match = pathname.match(/^\/api\/([a-z-]+)(?:\/(\d+))?$/);

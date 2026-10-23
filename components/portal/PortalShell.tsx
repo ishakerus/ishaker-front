@@ -1,4 +1,6 @@
 import {
+  Alert,
+  AlertIcon,
   Box,
   Button,
   Container,
@@ -26,11 +28,13 @@ import {
   TouchEvent,
   useEffect,
   useRef,
+  useState,
 } from "react";
 import { FaExclamationCircle, FaWhatsapp } from "react-icons/fa";
 import {
   FiBookOpen,
   FiBox,
+  FiCreditCard,
   FiLogOut,
   FiMenu,
   FiPackage,
@@ -51,6 +55,7 @@ const navItems = [
   { href: "/machines", label: "Machines", icon: FiBox },
   { href: "/product-lines", label: "Product lines", icon: FiPackage },
   { href: "/sales", label: "Sales", icon: FiUsers },
+  { href: "/billing", label: "Billing", icon: FiCreditCard },
   { href: "/promos", label: "Promos", icon: FiTag },
   { href: "/catalog", label: "Catalog", icon: FiBookOpen },
 ];
@@ -69,10 +74,30 @@ export function PortalShell({
   const router = useRouter();
   const mobileNav = useDisclosure();
   const touchStartX = useRef<number | null>(null);
+  const [billingWarning, setBillingWarning] = useState<"orange" | "red" | null>(null);
+  const showBilling = access === "client" && clientName?.trim().toLowerCase() === "bob";
   const visibleNavItems =
     access === "product"
       ? navItems.filter((item) => item.href === "/product-lines")
-      : navItems;
+      : navItems.filter((item) => item.href !== "/billing" || showBilling);
+
+  useEffect(() => {
+    if (!showBilling) return;
+    let alive = true;
+    const refresh = async () => {
+      if (document.visibilityState !== "visible") return;
+      try {
+        const response = await fetch("/api/portal/billing", { cache: "no-store" });
+        if (!response.ok) return;
+        const data = await response.json();
+        const colors = (data.subscriptions || []).map((sub: { notification_color?: string }) => sub.notification_color);
+        if (alive) setBillingWarning(colors.includes("red") ? "red" : colors.includes("orange") ? "orange" : null);
+      } catch { /* Billing warnings must not prevent portal access. */ }
+    };
+    void refresh();
+    const timer = window.setInterval(refresh, 60000);
+    return () => { alive = false; window.clearInterval(timer); };
+  }, [showBilling]);
 
   useEffect(() => {
     router.events.on("routeChangeStart", mobileNav.onClose);
@@ -397,7 +422,10 @@ export function PortalShell({
               </VStack>
               {headerAction ? <Box flexShrink={0}>{headerAction}</Box> : null}
             </Flex>
-            <Box order="2">{children}</Box>
+            <Box order="2">
+              {billingWarning && router.pathname !== "/billing" ? <Alert status={billingWarning === "red" ? "error" : "warning"} mb="5" borderRadius="lg"><AlertIcon /><Text>Your machine subscription needs attention. <Link href="/billing">View billing and payment options</Link>.</Text></Alert> : null}
+              {children}
+            </Box>
           </Container>
         </Box>
       </VStack>

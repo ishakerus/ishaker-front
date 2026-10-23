@@ -7,6 +7,7 @@ import { hasSupportCabinet } from "./impersonation";
 import { resolvePortalSession } from "../portal/auth";
 import { recordSupportAudit } from "./audit";
 import type { PortalSession } from "../../types/portal";
+import { guardSubscriptionWrite } from "../portal/subscriptionAccess";
 
 const runSupportRequest = async (handler: NextApiHandler, req: NextApiRequest, res: NextApiResponse, admin: SupportIdentity, scope: "admin" | "portal", portalSession?: PortalSession) => {
   res.setHeader("Cache-Control", "private, no-store");
@@ -40,7 +41,10 @@ export const withAdminApi = (handler: NextApiHandler): NextApiHandler => async (
 };
 
 export const withSupportPortalApi = (handler: NextApiHandler): NextApiHandler => async (req, res) => {
-  if (!hasSupportCabinet(req.headers.cookie)) return handler(req, res);
+  if (!hasSupportCabinet(req.headers.cookie)) {
+    if (await guardSubscriptionWrite(req, res)) return;
+    return handler(req, res);
+  }
   const admin = await resolveAdminSession(req.headers.cookie);
   const session = admin ? await resolvePortalSession(req.headers.cookie).catch(() => null) : null;
   if (!admin || !session?.support) return res.status(401).json({ error: "support_session_expired", message: "Return to the dashboard and reopen this cabinet." });
