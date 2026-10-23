@@ -598,7 +598,11 @@ export function MachineCellsSection({
                       flexShrink={0}
                     />
                   )}
-                  <Text noOfLines={1}>
+                  <Text
+                    noOfLines={selectedProduct?.is_dependent ? 2 : 1}
+                    whiteSpace="normal"
+                    minW="0"
+                  >
                     {selectedProduct
                       ? productLabel(selectedProduct)
                       : "— Empty —"}
@@ -669,7 +673,13 @@ export function MachineCellsSection({
                       )}
                       <Box flex="1" minW="0">
                         <HStack spacing="2">
-                          <Text noOfLines={1}>{productLabel(product)}</Text>
+                          <Text
+                            noOfLines={product.is_dependent ? 2 : 1}
+                            whiteSpace="normal"
+                            minW="0"
+                          >
+                            {productLabel(product)}
+                          </Text>
                           {product.is_dependent ? (
                             <Badge colorScheme="purple" flexShrink={0}>
                               Add-on
