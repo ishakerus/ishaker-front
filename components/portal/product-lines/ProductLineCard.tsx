@@ -122,6 +122,8 @@ export function ProductLineCard({
   return (
     <>
       <Box3D
+        id={`product-line-${productLine.id}`}
+        scrollMarginTop="6"
         overflow="hidden"
         variant="contrast"
         my="4"

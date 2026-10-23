@@ -222,12 +222,13 @@ export type PortalProductLine = {
   isPopular?: boolean;
   is_template?: boolean;
   can_be_added_to?: Array<Pick<PortalProductLine, "id" | "name">>;
+  cannot_be_added_to?: Array<Pick<PortalProductLine, "id" | "name">>;
   author?: Pick<PortalUser, "id" | "username" | "email"> | null;
   client?: Pick<Client, "id" | "company"> | null;
   machines?: Machine[];
   base_product_line?: Pick<
     PortalProductLine,
-    "id" | "name" | "cups" | "can_be_added_to"
+    "id" | "name" | "cups" | "can_be_added_to" | "cannot_be_added_to"
   > | null;
   cups?: PortalCup[];
   brands?: PortalBrand[];

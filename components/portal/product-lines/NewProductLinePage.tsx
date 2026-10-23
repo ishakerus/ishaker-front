@@ -50,7 +50,7 @@ import type {
 export type NewProductLinePageProps = {
   session: PortalSession;
   rootProductLines: PortalProductLine[];
-  templateProductLines?: PortalProductLine[];
+  mixProductLines?: PortalProductLine[];
   existingProductLines?: PortalProductLine[];
   splashes: PortalSplash[];
   productLine?: PortalProductLine;
@@ -113,7 +113,7 @@ export const getProductLineIcon = (name: string) =>
 export function NewProductLinePage({
   session,
   rootProductLines,
-  templateProductLines = [],
+  mixProductLines = [],
   existingProductLines = [],
   splashes,
   productLine,
@@ -166,8 +166,8 @@ export function NewProductLinePage({
           : "",
   );
   const [isSubmitting, setIsSubmitting] = useState(false);
-  const [canBeAddedToIds, setCanBeAddedToIds] = useState(
-    (productLine?.can_be_added_to || []).map((line) => String(line.id)),
+  const [cannotBeAddedToIds, setCannotBeAddedToIds] = useState(
+    (productLine?.cannot_be_added_to || []).map((line) => String(line.id)),
   );
   const [error, setError] = useState("");
   const [serverDuplicate, setServerDuplicate] =
@@ -279,22 +279,19 @@ export function NewProductLinePage({
           !duplicateProductLine &&
           !loadError,
       );
-  const canBeAddedToOptions = templateProductLines
-    .filter(
-      (line) =>
-        line.is_template === true && String(line.id) !== String(productLine?.id),
-    )
-    .map((line) => ({
-      id: String(line.id),
-      label: capitalizeName(line.name),
-    }));
-  const inheritedMixTargets = (
-    selectedBaseLine?.can_be_added_to ||
-    productLine?.base_product_line?.can_be_added_to ||
-    []
-  )
-    .map((line) => capitalizeName(line.name))
-    .join(", ");
+  const cannotBeAddedToOptions = mixProductLines.map((line) => ({
+    id: String(line.id),
+    label: capitalizeName(line.name),
+  }));
+  const inheritedMixExclusions = Array.from(
+    new Map(
+      [
+        ...(productLine?.cannot_be_added_to || []),
+        ...(selectedBaseLine?.cannot_be_added_to ||
+          productLine?.base_product_line?.cannot_be_added_to || []),
+      ].map((line) => [String(line.id), capitalizeName(line.name)]),
+    ).values(),
+  ).join(", ");
 
   const onSubmit = async (event: FormEvent<HTMLFormElement>) => {
     event.preventDefault();
@@ -316,7 +313,7 @@ export function NewProductLinePage({
               baseProductLineId,
               cupId,
               customSplashId,
-              ...(isStaffTemplate ? { canBeAddedToIds } : {}),
+              ...(isStaffTemplate ? { cannotBeAddedToIds } : {}),
             }),
           },
         );
@@ -410,12 +407,12 @@ export function NewProductLinePage({
             isBaseSelectionDisabled={isStaffTemplate}
             canSubmit={canSubmit}
             canEditMixRules={isStaffTemplate}
-            canBeAddedToIds={canBeAddedToIds}
-            canBeAddedToOptions={canBeAddedToOptions}
-            onCanBeAddedToChange={setCanBeAddedToIds}
-            canBeAddedToHint={
+            cannotBeAddedToIds={cannotBeAddedToIds}
+            cannotBeAddedToOptions={cannotBeAddedToOptions}
+            onCannotBeAddedToChange={setCannotBeAddedToIds}
+            cannotBeAddedToHint={
               session.access === "client"
-                ? inheritedMixTargets || "None"
+                ? inheritedMixExclusions || "None — all product lines are allowed"
                 : undefined
             }
             customSplashId={customSplashId}

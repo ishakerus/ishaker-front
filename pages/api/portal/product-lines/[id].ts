@@ -121,7 +121,7 @@ async function handler(req: NextApiRequest, res: NextApiResponse) {
       });
     }
 
-    if (Object.prototype.hasOwnProperty.call(req.body || {}, "canBeAddedToIds")) {
+    if (Object.prototype.hasOwnProperty.call(req.body || {}, "cannotBeAddedToIds")) {
       if (
         session.access !== "product" ||
         ownedProductLine.is_template !== true
@@ -131,7 +131,7 @@ async function handler(req: NextApiRequest, res: NextApiResponse) {
           message: "Only iShaker staff can edit product-line mix rules.",
         });
       }
-      const rawTargetIds = req.body?.canBeAddedToIds;
+      const rawTargetIds = req.body?.cannotBeAddedToIds;
       const targetIds = Array.isArray(rawTargetIds)
         ? rawTargetIds.map(asId)
         : [];
@@ -143,13 +143,13 @@ async function handler(req: NextApiRequest, res: NextApiResponse) {
       ) {
         return res.status(400).json({
           error: "invalid_mix_lines",
-          message: "Choose unique template product lines.",
+          message: "Choose unique root product lines.",
         });
       }
 
       if (targetIds.length) {
         const targetParams = new URLSearchParams();
-        targetParams.set("filters[is_template][$eq]", "true");
+        targetParams.set("filters[base_product_line][id][$null]", "true");
         targetIds.forEach((id, index) =>
           targetParams.set(`filters[id][$in][${index}]`, id),
         );
@@ -161,7 +161,7 @@ async function handler(req: NextApiRequest, res: NextApiResponse) {
         if (targets.length !== targetIds.length) {
           return res.status(400).json({
             error: "invalid_mix_lines",
-            message: "Every destination must be a template product line.",
+            message: "Every excluded destination must be a root product line.",
           });
         }
       }
@@ -171,7 +171,7 @@ async function handler(req: NextApiRequest, res: NextApiResponse) {
         {
           method: "PUT",
           body: JSON.stringify({
-            data: { can_be_added_to: targetIds.map(Number) },
+            data: { cannot_be_added_to: targetIds.map(Number) },
           }),
         },
       );

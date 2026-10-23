@@ -41,7 +41,7 @@ export function CatalogCollections({ tastes, brands, clientId }: Props) {
               return (
                 <Box key={item.id} bg="bg.900" border="1px solid" borderColor="whiteAlpha.100" borderRadius="2xl" overflow="hidden">
                   <AspectRatio ratio={1} bg="bg.800">
-                    <Image src={getSmallestMediaUrl(media) || undefined} alt={item.name} objectFit="contain" p="3" />
+                    <Image loading="lazy" decoding="async" src={getSmallestMediaUrl(media) || undefined} alt={item.name} objectFit="contain" p="3" />
                   </AspectRatio>
                   <VStack p="4" spacing="2" align="stretch">
                     <Text color="bg.50" fontWeight="800">{item.name}</Text>

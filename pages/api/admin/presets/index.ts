@@ -36,6 +36,7 @@ const arePresetProductsValid = async (cells: PresetCellInput[]) => {
   params.set("fields[0]", "name");
   params.set("fields[1]", "product_type");
   params.set("fields[2]", "isActive");
+  params.set("fields[3]", "is_dependent");
   params.set("populate[product_line][fields][0]", "name");
   params.set("populate[brand][fields][0]", "name");
   params.set("populate[custom_main][fields][0]", "name");
@@ -144,7 +145,7 @@ async function handler(
             "/api/product-lines?sort[0]=name:ASC&pagination[pageSize]=2000",
           ),
           requestStrapiRestAsService(
-            "/api/products?fields[0]=name&fields[1]=product_type&fields[2]=isActive&" +
+            "/api/products?fields[0]=name&fields[1]=product_type&fields[2]=isActive&fields[3]=is_dependent&" +
               "populate[dosage]=*&populate[product_line]=*&" +
               "populate[custom_main][fields][0]=name&populate[custom_main][fields][1]=url&populate[custom_main][fields][2]=formats&" +
               "populate[taste][populate][main][fields][0]=name&populate[taste][populate][main][fields][1]=url&populate[taste][populate][main][fields][2]=formats&" +

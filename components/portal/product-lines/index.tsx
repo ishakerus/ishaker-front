@@ -155,6 +155,21 @@ export function ProductLinesPage({
   loadError,
 }: ProductLinesPageProps) {
   const router = useRouter();
+  const scrolledToProductLine = useRef<string | null>(null);
+  useEffect(() => {
+    const anchor = router.asPath.split("#")[1];
+    if (!anchor) {
+      scrolledToProductLine.current = null;
+      return;
+    }
+    if (/^product-line-\d+$/.test(anchor) && scrolledToProductLine.current !== anchor) {
+      const card = document.getElementById(anchor);
+      if (card) {
+        card.scrollIntoView({ block: "start" });
+        scrolledToProductLine.current = anchor;
+      }
+    }
+  }, [router.asPath, productLines]);
   const productLineChooser = useDisclosure();
   const handledInitialNewProduct = useRef(false);
   const [selectedMachineId, setSelectedMachineId] = useState(

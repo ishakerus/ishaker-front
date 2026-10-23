@@ -61,13 +61,21 @@ export default function LoginPage() {
           password,
         }),
       });
+      const payload = await response.json().catch(() => null);
       if (!response.ok) {
         setError(
-          "We couldn’t sign you in. Check your nickname or email and password.",
+          response.status === 401
+            ? "We couldn’t sign you in. Check your nickname or email and password."
+            : response.status === 429
+              ? "Too many sign-in attempts. Please try again later."
+              : payload?.error === "invalid_origin"
+                ? "This sign-in page is using an unexpected address. Please open the portal at its configured address and try again."
+                : payload?.error === "portal_access_required"
+                  ? "Your account does not have portal access. Please contact support."
+                  : "The portal is temporarily unavailable. Please try again.",
         );
         return;
       }
-      const payload = await response.json().catch(() => null);
       if (payload?.role === "support") {
         await router.replace(payload.redirectTo || "/admin");
         return;

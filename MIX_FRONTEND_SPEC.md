@@ -1,5 +1,11 @@
 # Frontend spec — Mix: pouring one product into another (kiosk patch 72)
 
+> Updated policy: line compatibility is now allowed by default, with editable
+> `product-line.cannot_be_added_to` exclusions. The allowlist descriptions below
+> are historical, as are the base-price-only assumptions for add-ons. Add-on
+> prices now use `dosage.full_drink_price` and require kiosk patch 82 or later.
+> See [the current mixing rules](../strapi/docs/mixing.md).
+
 ## Goal
 A kiosk can pour two products into one cup: a **base** drink (e.g. Vanilla Whey Protein) plus an
 **addon** (e.g. Strawberry Creatine). The customer picks the ratio on the kiosk's "Check your

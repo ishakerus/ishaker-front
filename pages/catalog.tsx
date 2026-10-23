@@ -1,3 +1,4 @@
+import { EnglishFileInput } from "../components/shared/EnglishFileInput";
 import {
   Alert,
   AlertIcon,
@@ -279,10 +280,9 @@ export default function CatalogPage({
 
               <FormControl isRequired isDisabled={isGenerating || isSubmitting}>
                 <FormLabel>Main image</FormLabel>
-                <Input
-                  type="file"
+                <EnglishFileInput
+                  selectedFiles={main ? [main] : []}
                   accept=".png,image/png"
-                  p="1"
                   onChange={async (event) => {
                     const input = event.currentTarget;
                     const file = input.files?.[0];
@@ -354,11 +354,10 @@ export default function CatalogPage({
 
               <FormControl isRequired isDisabled={isGenerating || isSubmitting}>
                 <FormLabel>Ingredient images</FormLabel>
-                <Input
-                  type="file"
+                <EnglishFileInput
+                  selectedFiles={elements}
                   multiple
                   accept=".png,image/png"
-                  p="1"
                   onChange={async (event) => {
                     const input = event.currentTarget;
                     const files = Array.from(input.files || []);

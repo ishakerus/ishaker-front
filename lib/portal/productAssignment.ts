@@ -1,4 +1,5 @@
 import type { PortalCatalogProduct } from "../../types/portal";
+import { ADDON_PRICE_ERROR, isValidAddonPrice } from "./addonPrice";
 
 export type ProductAssignmentProblem = {
   code:
@@ -8,6 +9,7 @@ export type ProductAssignmentProblem = {
     | "no_product_line"
     | "no_usable_price"
     | "bad_volume"
+    | "bad_dosage"
     | "no_image";
   detail: string;
 };
@@ -18,6 +20,7 @@ export const getProductAssignmentProblems = (
   const problems: ProductAssignmentProblem[] = [];
   const price = Number(product.dosage?.full_drink_price);
   const volume = Number(product.dosage?.full_drink_volume);
+  const isAddon = product.is_dependent === true;
 
   if (product.isActive === false) {
     problems.push({
@@ -41,21 +44,34 @@ export const getProductAssignmentProblems = (
     });
   }
   if (
-    product.is_dependent !== true &&
-    (!Number.isFinite(price) || price <= 0)
+    isAddon
+      ? !isValidAddonPrice(product.dosage?.full_drink_price)
+      : !Number.isFinite(price) || price <= 0
   ) {
     problems.push({
       code: "no_usable_price",
-      detail: "Set a full-drink price greater than zero.",
+      detail: isAddon
+        ? ADDON_PRICE_ERROR
+        : "Set a full-drink price greater than zero.",
     });
   }
-  if (!Number.isFinite(volume) || volume < 50) {
+  if (!isAddon && (!Number.isFinite(volume) || volume < 50)) {
     problems.push({
       code: "bad_volume",
       detail: "Set a full-drink volume of at least 50 ml.",
     });
   }
+  if (isAddon) {
+    const dosage = Number(product.dosage?.product);
+    if (!Number.isFinite(dosage) || dosage <= 0) {
+      problems.push({
+        code: "bad_dosage",
+        detail: "Set an add-on dosage greater than zero.",
+      });
+    }
+  }
   if (
+    !isAddon &&
     !product.custom_main?.name &&
     !product.taste?.main?.name
   ) {

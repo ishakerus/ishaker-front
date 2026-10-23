@@ -32,6 +32,7 @@ import {
 } from "../../../lib/admin/auth";
 import { clearSupportCabinetCookie } from "../../../lib/admin/impersonation";
 import { recordSupportAudit } from "../../../lib/admin/audit";
+import { fetchJsonWithTimeout } from "../../../lib/http/fetchJsonWithTimeout";
 
 const findPortalUser = async (identifier: string) => {
   const params = new URLSearchParams();
@@ -121,13 +122,21 @@ async function handler(req: NextApiRequest, res: NextApiResponse) {
     }
   }
 
-  const response = await fetch(`${getStrapiBaseUrl()}/api/auth/local`, {
+  const auth = await fetchJsonWithTimeout(`${getStrapiBaseUrl()}/api/auth/local`, {
     method: "POST",
     headers: { "content-type": "application/json" },
     body: JSON.stringify({ identifier: authIdentifier, password }),
-  });
+  }).catch(() => null);
 
-  const payload = await response.json().catch(() => null);
+  if (!auth || auth.response.status >= 500 || (auth.response.ok && !auth.payload?.jwt)) {
+    return res.status(503).json({ error: "portal_auth_unavailable" });
+  }
+  const { response, payload } = auth;
+
+  if (response.status === 429) {
+    res.setHeader("Retry-After", response.headers.get("Retry-After") || "900");
+    return res.status(429).json({ error: "rate_limited" });
+  }
 
   if (!response.ok || !payload?.jwt) {
     recordLoginFailure(attemptKey);

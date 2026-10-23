@@ -178,6 +178,8 @@ export function ProductCard({
               </Text>
               {brandImage ? (
                 <Image
+                  loading="lazy"
+                  decoding="async"
                   src={brandImage}
                   alt={`${brandName} logo`}
                   maxW="full"
@@ -210,6 +212,8 @@ export function ProductCard({
               </Text>
               {mainImage ? (
                 <Image
+                  loading="lazy"
+                  decoding="async"
                   src={mainImage}
                   alt={`${productName} taste`}
                   maxW="full"
@@ -257,13 +261,15 @@ export function ProductCard({
             >
               {finalSplashImage ? (
                 <Image
+                  loading="lazy"
+                  decoding="async"
                   src={finalSplashImage}
                   alt=""
                   aria-hidden="true"
                   position="absolute"
                   zIndex="3"
                   left="0"
-                  bottom="62.5%"
+                  bottom="calc(71.5% + 2px)"
                   w="full"
                   h="75%"
                   objectFit="contain"
@@ -272,6 +278,8 @@ export function ProductCard({
               ) : null}
               {cupImage ? (
                 <Image
+                  loading="lazy"
+                  decoding="async"
                   src={cupImage}
                   alt={displayCup?.name || `${productName} cup`}
                   position="absolute"

@@ -133,7 +133,9 @@ const buildDrafts = (
 
 const productLabel = (product: PortalCatalogProduct) => {
   const line = product.product_line?.name?.trim();
-  const taste = product.taste?.name?.trim() || product.name;
+  const taste = product.is_dependent
+    ? product.name
+    : product.taste?.name?.trim() || product.name;
   return line ? `${line} — ${taste}` : `Orphan — ${taste}`;
 };
 
@@ -601,6 +603,11 @@ export function MachineCellsSection({
                       ? productLabel(selectedProduct)
                       : "— Empty —"}
                   </Text>
+                  {selectedProduct?.is_dependent ? (
+                    <Badge colorScheme="purple" flexShrink={0}>
+                      Add-on
+                    </Badge>
+                  ) : null}
                 </HStack>
               </MenuButton>
               <MenuList
@@ -661,7 +668,14 @@ export function MachineCellsSection({
                         />
                       )}
                       <Box flex="1" minW="0">
-                        <Text noOfLines={1}>{productLabel(product)}</Text>
+                        <HStack spacing="2">
+                          <Text noOfLines={1}>{productLabel(product)}</Text>
+                          {product.is_dependent ? (
+                            <Badge colorScheme="purple" flexShrink={0}>
+                              Add-on
+                            </Badge>
+                          ) : null}
+                        </HStack>
                         {unavailable ? (
                           <Text color="orange.200" fontSize="xs">
                             Unavailable
@@ -917,6 +931,18 @@ export function MachineCellsSection({
             </SimpleGrid>
           </Box>
         ) : null}
+        <Button
+          type="button"
+          leftIcon={<FiSave />}
+          variant="primary"
+          size="lg"
+          alignSelf="flex-start"
+          isLoading={isSaving}
+          isDisabled={hasValidationError}
+          onClick={() => void save()}
+        >
+          Save changes
+        </Button>
       </VStack>
     </Box>
   );

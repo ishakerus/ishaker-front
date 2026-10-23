@@ -1,6 +1,10 @@
 import { withSupportPortalApi } from "../../../../../lib/admin/access";
 import type { NextApiRequest, NextApiResponse } from "next";
 import { capitalizeName } from "../../../../../lib/formatName";
+import {
+  ADDON_PRICE_ERROR,
+  isValidAddonPrice,
+} from "../../../../../lib/portal/addonPrice";
 import { getPortalSessionFromApiRequest } from "../../../../../lib/portal/auth";
 import { requestWithSplashOwnershipFallback } from "../../../../../lib/portal/splashOwnership";
 import {
@@ -8,10 +12,7 @@ import {
   hasStrapiCatalogToken,
   requestStrapiRestAsService,
 } from "../../../../../services/server/strapiClient";
-import type {
-  PortalCup,
-  PortalProductLine,
-} from "../../../../../types/portal";
+import type { PortalCup, PortalProductLine } from "../../../../../types/portal";
 
 type CreatedProduct = {
   id: string | number;
@@ -68,39 +69,39 @@ const componentUnits = new Set(["mg", "g", "mcg", "kJ", "kcal"]);
 const validateTargetMachines = async (machines: TargetMachine[] = []) =>
   !hasStrapiCatalogToken()
     ? []
-    :
-  Promise.all(
-    machines
-      .filter((machine) => Boolean(machine.serial_number))
-      .map(async (machine) => {
-        try {
-          const response = await fetchStrapiCatalogEndpoint(
-            `/api/machines/${encodeURIComponent(machine.serial_number!)}/planogram`,
-          );
-          const payload = await response.json().catch(() => null);
-          return {
-            machineId: machine.id,
-            serial: machine.serial_number,
-            title: machine.title || null,
-            status: response.status,
-            source: response.headers.get("x-planogram-source"),
-            payload,
-          };
-        } catch {
-          return {
-            machineId: machine.id,
-            serial: machine.serial_number,
-            title: machine.title || null,
-            status: 502,
-            source: null,
-            payload: {
-              error: "planogram_unavailable",
-              message: "The saved product could not be validated for this machine.",
-            },
-          };
-        }
-      }),
-  );
+    : Promise.all(
+        machines
+          .filter((machine) => Boolean(machine.serial_number))
+          .map(async (machine) => {
+            try {
+              const response = await fetchStrapiCatalogEndpoint(
+                `/api/machines/${encodeURIComponent(machine.serial_number!)}/planogram`,
+              );
+              const payload = await response.json().catch(() => null);
+              return {
+                machineId: machine.id,
+                serial: machine.serial_number,
+                title: machine.title || null,
+                status: response.status,
+                source: response.headers.get("x-planogram-source"),
+                payload,
+              };
+            } catch {
+              return {
+                machineId: machine.id,
+                serial: machine.serial_number,
+                title: machine.title || null,
+                status: 502,
+                source: null,
+                payload: {
+                  error: "planogram_unavailable",
+                  message:
+                    "The saved product could not be validated for this machine.",
+                },
+              };
+            }
+          }),
+      );
 
 const asString = (value: unknown) =>
   typeof value === "string" ? value.trim() : "";
@@ -127,6 +128,24 @@ const parseDosage = (
 ): SubmittedDosage | null => {
   if (!value || typeof value !== "object") return null;
   const dosage = value as Record<string, unknown>;
+  if (isDependent) {
+    const product = Number(dosage.product);
+    const price = optionalAmount(dosage.fullDrinkPrice, true);
+    if (
+      !Number.isFinite(product) || product <= 0 ||
+      !isValidAddonPrice(dosage.fullDrinkPrice) || typeof price !== "number"
+    )
+      return null;
+    return {
+      full_drink_volume: 0,
+      full_drink_price: price,
+      small_drink_volume: null,
+      small_drink_price: null,
+      water: 0,
+      product,
+      conversion_factor: 4,
+    };
+  }
   const fullDrinkVolume = Number(dosage.fullDrinkVolume);
   const fullDrinkPrice = optionalAmount(dosage.fullDrinkPrice);
   const smallDrinkVolume = optionalAmount(dosage.smallDrinkVolume);
@@ -161,9 +180,13 @@ const parseComponents = (value: unknown): SubmittedComponent[] | null => {
 
   const components = value.map((item) => {
     const component = item && typeof item === "object" ? item : {};
-    const componentId = asId((component as { componentId?: unknown }).componentId);
+    const componentId = asId(
+      (component as { componentId?: unknown }).componentId,
+    );
     const isCustom = (component as { isCustom?: unknown }).isCustom === true;
-    const name = capitalizeName(asString((component as { name?: unknown }).name));
+    const name = capitalizeName(
+      asString((component as { name?: unknown }).name),
+    );
     const quantity = Number((component as { quantity?: unknown }).quantity);
     const unit = asString((component as { unit?: unknown }).unit);
     return { componentId, isCustom, name, quantity, unit };
@@ -173,7 +196,8 @@ const parseComponents = (value: unknown): SubmittedComponent[] | null => {
     components.some(
       (component) =>
         (!component.componentId && !component.isCustom) ||
-        (!component.componentId && (component.name.length < 2 || component.name.length > 100)) ||
+        (!component.componentId &&
+          (component.name.length < 2 || component.name.length > 100)) ||
         !Number.isFinite(component.quantity) ||
         component.quantity <= 0 ||
         !componentUnits.has(component.unit),
@@ -194,10 +218,7 @@ const parseComponents = (value: unknown): SubmittedComponent[] | null => {
     : null;
 };
 
-export async function handler(
-  req: NextApiRequest,
-  res: NextApiResponse,
-) {
+export async function handler(req: NextApiRequest, res: NextApiResponse) {
   if (req.method !== "POST" && req.method !== "PUT") {
     res.setHeader("Allow", ["POST", "PUT"]);
     return res.status(405).json({ error: "method_not_allowed" });
@@ -206,20 +227,24 @@ export async function handler(
   const session = await getPortalSessionFromApiRequest(req);
   if (!session) return res.status(401).json({ error: "unauthorized" });
 
-  const productLineId = asId(Array.isArray(req.query.id) ? req.query.id[0] : req.query.id);
+  const productLineId = asId(
+    Array.isArray(req.query.id) ? req.query.id[0] : req.query.id,
+  );
   const brandId = asId(req.body?.brandId);
   const existingProductId = asId(req.body?.existingProductId);
   const isEditing = req.method === "PUT";
-  const splashId = asId(req.body?.splashId);
-  const circleId = asId(req.body?.circleId);
-  const mainImageId = asId(req.body?.mainImageId);
-  const cupId = asId(req.body?.cupId);
   const isDependent = req.body?.isDependent === true;
+  const splashId = isDependent ? "" : asId(req.body?.splashId);
+  const circleId = isDependent ? "" : asId(req.body?.circleId);
+  const mainImageId = isDependent ? "" : asId(req.body?.mainImageId);
+  const cupId = isDependent ? "" : asId(req.body?.cupId);
   const rawCanBeAddedToIds = req.body?.canBeAddedToIds;
   const canBeAddedToIds = Array.isArray(rawCanBeAddedToIds)
     ? rawCanBeAddedToIds.map(asId)
     : [];
-  const submittedComponents = parseComponents(req.body?.components);
+  const submittedComponents = isDependent
+    ? []
+    : parseComponents(req.body?.components);
   const submittedDosage = parseDosage(req.body?.dosage, isDependent);
   const name = capitalizeName(asString(req.body?.name));
   const description = asString(req.body?.description);
@@ -244,6 +269,7 @@ export async function handler(
     });
   }
   if (
+    !isDependent &&
     !existingProductId &&
     (!splashId || !circleId || !mainImageId)
   ) {
@@ -255,19 +281,21 @@ export async function handler(
   if (!submittedComponents) {
     return res.status(400).json({
       error: "invalid_components",
-      message: "Components must be unique and include a positive quantity (maximum 50).",
+      message:
+        "Components must be unique and include a positive quantity (maximum 50).",
     });
   }
   if (!submittedDosage) {
     return res.status(400).json({
       error: "invalid_dosage",
       message: isDependent
-        ? "Required dosage values must be positive."
+        ? `Dosage must be greater than zero. ${ADDON_PRICE_ERROR}`
         : "Required dosage values and the full-drink price must be positive.",
     });
   }
   if (
-    !Array.isArray(rawCanBeAddedToIds) ||
+    (!Array.isArray(rawCanBeAddedToIds) &&
+      !(isDependent && rawCanBeAddedToIds === undefined)) ||
     canBeAddedToIds.some((id) => !id) ||
     canBeAddedToIds.length > 200 ||
     new Set(canBeAddedToIds).size !== canBeAddedToIds.length
@@ -277,56 +305,57 @@ export async function handler(
       message: "Choose unique drinks for this add-on.",
     });
   }
-  if (submittedDosage.full_drink_volume < 50) {
-    return res.status(400).json({
-      error: "drink_volume_too_low",
-      message: "Full drink volume must be at least 50ml.",
-    });
-  }
-  if (
-    submittedDosage.water + submittedDosage.product >
-    submittedDosage.full_drink_volume
-  ) {
-    return res.status(400).json({
-      error: "dosage_exceeds_drink_volume",
-      message: "Water + Product can't exceed the drink volume.",
-    });
-  }
-  if (
-    submittedDosage.small_drink_volume !== null &&
-    submittedDosage.small_drink_volume < 100
-  ) {
-    return res.status(400).json({
-      error: "small_drink_volume_too_low",
-      message: "Small drink volume must be at least 100ml.",
-    });
-  }
-  if (submittedDosage.water < 50 || submittedDosage.water > 500) {
-    return res.status(400).json({
-      error: "water_out_of_range",
-      message: "Water must be between 50ml and 500ml.",
-    });
-  }
-  if (
-    submittedDosage.small_drink_volume !== null &&
-    submittedDosage.small_drink_volume >= submittedDosage.full_drink_volume
-  ) {
-    return res.status(400).json({
-      error: "small_drink_volume_too_large",
-      message: "Small drink volume must be less than full drink volume.",
-    });
-  }
-  if (submittedDosage.small_drink_volume !== null) {
-    const scale =
-      submittedDosage.small_drink_volume /
-      submittedDosage.full_drink_volume;
-    const scaledContents =
-      submittedDosage.water * scale + submittedDosage.product * scale;
-    if (scaledContents > submittedDosage.small_drink_volume + 1e-9) {
+  if (!isDependent) {
+    if (submittedDosage.full_drink_volume < 50) {
       return res.status(400).json({
-        error: "dosage_exceeds_small_drink_volume",
+        error: "drink_volume_too_low",
+        message: "Full drink volume must be at least 50ml.",
+      });
+    }
+    if (
+      submittedDosage.water + submittedDosage.product >
+      submittedDosage.full_drink_volume
+    ) {
+      return res.status(400).json({
+        error: "dosage_exceeds_drink_volume",
         message: "Water + Product can't exceed the drink volume.",
       });
+    }
+    if (
+      submittedDosage.small_drink_volume !== null &&
+      submittedDosage.small_drink_volume < 100
+    ) {
+      return res.status(400).json({
+        error: "small_drink_volume_too_low",
+        message: "Small drink volume must be at least 100ml.",
+      });
+    }
+    if (submittedDosage.water < 50 || submittedDosage.water > 500) {
+      return res.status(400).json({
+        error: "water_out_of_range",
+        message: "Water must be between 50ml and 500ml.",
+      });
+    }
+    if (
+      submittedDosage.small_drink_volume !== null &&
+      submittedDosage.small_drink_volume >= submittedDosage.full_drink_volume
+    ) {
+      return res.status(400).json({
+        error: "small_drink_volume_too_large",
+        message: "Small drink volume must be less than full drink volume.",
+      });
+    }
+    if (submittedDosage.small_drink_volume !== null) {
+      const scale =
+        submittedDosage.small_drink_volume / submittedDosage.full_drink_volume;
+      const scaledContents =
+        submittedDosage.water * scale + submittedDosage.product * scale;
+      if (scaledContents > submittedDosage.small_drink_volume + 1e-9) {
+        return res.status(400).json({
+          error: "dosage_exceeds_small_drink_volume",
+          message: "Water + Product can't exceed the drink volume.",
+        });
+      }
     }
   }
   if (name.length < 2 || name.length > 100) {
@@ -335,28 +364,32 @@ export async function handler(
       message: "Name must contain between 2 and 100 characters.",
     });
   }
-  if (description.length > 2000) {
+  if (!isDependent && description.length > 2000) {
     return res.status(400).json({
       error: "invalid_description",
       message: "Description must not exceed 2000 characters.",
     });
   }
-  if (!["powder", "concentrate"].includes(productType)) {
+  if (!isDependent && !["powder", "concentrate"].includes(productType)) {
     return res.status(400).json({
       error: "invalid_product_type",
       message: "Select a valid product type.",
     });
   }
-  if (!["milkshake", "sport nutrition"].includes(productPurpose)) {
+  if (
+    !isDependent &&
+    !["milkshake", "sport nutrition"].includes(productPurpose)
+  ) {
     return res.status(400).json({
       error: "invalid_product_purpose",
       message: "Select a valid product purpose.",
     });
   }
   if (
-    !["g", "ml"].includes(servingUnit) ||
-    !Number.isFinite(servingQty) ||
-    servingQty <= 0
+    !isDependent &&
+    (!["g", "ml"].includes(servingUnit) ||
+      !Number.isFinite(servingQty) ||
+      servingQty <= 0)
   ) {
     return res.status(400).json({
       error: "invalid_serving",
@@ -394,8 +427,8 @@ export async function handler(
   submittedComponents
     .filter((component) => Boolean(component.componentId))
     .forEach((component, index) => {
-    componentParams.set(`filters[id][$in][${index}]`, component.componentId);
-  });
+      componentParams.set(`filters[id][$in][${index}]`, component.componentId);
+    });
   componentParams.set("pagination[pageSize]", "2000");
 
   try {
@@ -442,15 +475,89 @@ export async function handler(
     }
     const duplicateNameParams = new URLSearchParams();
     duplicateNameParams.set("filters[name][$eqi]", name);
-    duplicateNameParams.set(
-      "filters[product_line][id][$eq]",
-      productLineId,
-    );
+    duplicateNameParams.set("filters[product_line][id][$eq]", productLineId);
     if (isEditing && existingProductId) {
       duplicateNameParams.set("filters[id][$ne]", existingProductId);
     }
     duplicateNameParams.set("fields[0]", "name");
     duplicateNameParams.set("pagination[pageSize]", "1");
+
+    if (isDependent) {
+      const [brand, duplicateProducts, existingProduct] = await Promise.all([
+        requestStrapiRestAsService<RelatedEntity>(`/api/brands/${brandId}`),
+        requestStrapiRestAsService<CreatedProduct[]>(
+          `/api/products?${duplicateNameParams.toString()}`,
+        ),
+        isEditing
+          ? requestStrapiRestAsService<
+              CreatedProduct & {
+                dosage?: { conversion_factor?: number | string | null };
+              }
+            >(`/api/products/${existingProductId}?populate[dosage]=*`)
+          : Promise.resolve(null),
+      ]);
+
+      if (!brand?.id) {
+        return res.status(400).json({
+          error: "invalid_brand",
+          message: "The selected brand no longer exists.",
+        });
+      }
+      if (duplicateProducts.length) {
+        return res.status(409).json({
+          error: "duplicate_name",
+          message:
+            "A product with this name already exists in this product line.",
+        });
+      }
+      if (isEditing && !existingProduct?.id) {
+        return res.status(400).json({
+          error: "invalid_product",
+          message: "The selected product no longer exists.",
+        });
+      }
+
+      // Calibration is machine configuration, separate from the add-on's dose.
+      const conversionFactor = Number(
+        existingProduct?.dosage?.conversion_factor,
+      );
+      if (Number.isFinite(conversionFactor) && conversionFactor > 0) {
+        submittedDosage.conversion_factor = conversionFactor;
+      }
+      const data = {
+        name,
+        brand: brand.id,
+        product_type: "powder",
+        description: null,
+        serving_qty: null,
+        serving_unit: "g",
+        components: { set: [] },
+        nutrition: [],
+        dosage: submittedDosage,
+        is_dependent: true,
+        ...(rawCanBeAddedToIds !== undefined || !isEditing
+          ? { can_be_added_to: canBeAddedToIds.map(Number) }
+          : {}),
+        ...(!isEditing
+          ? { author: session.user.id, product_line: productLine.id }
+          : {}),
+      };
+      const product = await requestStrapiRestAsService<CreatedProduct>(
+        isEditing ? `/api/products/${existingProductId}` : "/api/products",
+        {
+          method: isEditing ? "PUT" : "POST",
+          body: JSON.stringify({ data }),
+        },
+      );
+      const planogramChecks = await validateTargetMachines(
+        productLine.machines as TargetMachine[] | undefined,
+      );
+      return res.status(isEditing ? 200 : 201).json({
+        product,
+        ...(isEditing ? { updatedInPlace: true } : {}),
+        planogramChecks,
+      });
+    }
 
     const baseProductParams = new URLSearchParams();
     if (existingProductId && !isEditing) {
@@ -518,10 +625,7 @@ export async function handler(
 
     const visibleSplashParams = new URLSearchParams();
     visibleSplashParams.set("filters[id][$eq]", resolvedSplashId);
-    visibleSplashParams.set(
-      "filters[$or][0][author][username][$eq]",
-      "root",
-    );
+    visibleSplashParams.set("filters[$or][0][author][username][$eq]", "root");
     visibleSplashParams.set(
       "filters[$or][1][author][id][$eq]",
       String(session.user.id),
@@ -581,7 +685,8 @@ export async function handler(
     if (duplicateProducts.length) {
       return res.status(409).json({
         error: "duplicate_name",
-        message: "A product with this name already exists in this product line.",
+        message:
+          "A product with this name already exists in this product line.",
       });
     }
 
@@ -601,7 +706,8 @@ export async function handler(
     if (!splash?.id || !circle?.id || !mainImage?.id) {
       return res.status(400).json({
         error: "invalid_visuals",
-        message: "The selected splash, circle, or taste main image no longer exists.",
+        message:
+          "The selected splash, circle, or taste main image no longer exists.",
       });
     }
 
@@ -648,11 +754,13 @@ export async function handler(
       return { component, quantity: submitted.quantity, unit: submitted.unit };
     });
     const componentIds = productComponents.map(({ component }) => component.id);
-    const nutrition = productComponents.map(({ component, quantity, unit }) => ({
-      name: component.name,
-      qty: quantity,
-      unit,
-    }));
+    const nutrition = productComponents.map(
+      ({ component, quantity, unit }) => ({
+        name: component.name,
+        qty: quantity,
+        unit,
+      }),
+    );
 
     if (existingProductId && isEditing) {
       // Editing one of the user's own products in this line: update in place.
@@ -704,44 +812,55 @@ export async function handler(
     // Reusing a reference product must NOT connect it (Product.product_line is
     // many-to-one — connecting would MOVE it out of its owner's line). Instead we
     // CLONE it: a new product owned by this user, with base_product provenance.
-    const product = await requestStrapiRestAsService<CreatedProduct>("/api/products", {
-      method: "POST",
-      body: JSON.stringify({
-        data: {
-          name,
-          brand: brand.id,
-          ...(description ? { description } : {}),
-          product_type: productType,
-          product_purpose: productPurpose,
-          serving_qty: servingQty,
-          serving_unit: servingUnit,
-          author: session.user.id,
-          product_line: productLine.id,
-          ...(existingProductId ? { base_product: Number(existingProductId) } : {}),
-          custom_splash: splash.id,
-          custom_circle: circle.id,
-          custom_main: mainImage.id,
-          ...(customCup?.id ? { cup: customCup.id } : {}),
-          ...(componentIds.length ? { components: { connect: componentIds } } : {}),
-          nutrition,
-          dosage: submittedDosage,
-          is_dependent: isDependent,
-          can_be_added_to: canBeAddedToIds.map(Number),
-        },
-      }),
-    });
+    const product = await requestStrapiRestAsService<CreatedProduct>(
+      "/api/products",
+      {
+        method: "POST",
+        body: JSON.stringify({
+          data: {
+            name,
+            brand: brand.id,
+            ...(description ? { description } : {}),
+            product_type: productType,
+            product_purpose: productPurpose,
+            serving_qty: servingQty,
+            serving_unit: servingUnit,
+            author: session.user.id,
+            product_line: productLine.id,
+            ...(existingProductId
+              ? { base_product: Number(existingProductId) }
+              : {}),
+            custom_splash: splash.id,
+            custom_circle: circle.id,
+            custom_main: mainImage.id,
+            ...(customCup?.id ? { cup: customCup.id } : {}),
+            ...(componentIds.length
+              ? { components: { connect: componentIds } }
+              : {}),
+            nutrition,
+            dosage: submittedDosage,
+            is_dependent: isDependent,
+            can_be_added_to: canBeAddedToIds.map(Number),
+          },
+        }),
+      },
+    );
 
     const planogramChecks = await validateTargetMachines(
       productLine.machines as TargetMachine[] | undefined,
     );
     return res.status(201).json({ product, planogramChecks });
   } catch (error) {
-    console.error("[portal/product-lines/:id/products] creation failed:", error);
+    console.error(
+      "[portal/product-lines/:id/products] creation failed:",
+      error,
+    );
     const apiError = error as {
       status?: number;
       response?: { error?: { message?: string } };
     };
-    const status = apiError.status && apiError.status < 500 ? apiError.status : 500;
+    const status =
+      apiError.status && apiError.status < 500 ? apiError.status : 500;
     return res.status(status).json({
       error: "product_creation_failed",
       message:

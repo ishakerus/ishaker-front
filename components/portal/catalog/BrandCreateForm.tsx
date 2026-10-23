@@ -1,3 +1,4 @@
+import { EnglishFileInput } from "../../shared/EnglishFileInput";
 import { Alert, AlertIcon, Box, Button, FormControl, FormHelperText, FormLabel, Image, Input, Link, Text, VStack } from "@chakra-ui/react";
 import NextLink from "next/link";
 import { useRouter } from "next/router";
@@ -64,7 +65,7 @@ export function BrandCreateForm() {
         </FormControl>
         <FormControl isRequired isDisabled={isSubmitting}>
           <FormLabel>Brand logo</FormLabel>
-          <Input type="file" accept=".png,image/png" p="1" onChange={async (event) => {
+          <EnglishFileInput selectedFiles={logo ? [logo] : []} accept=".png,image/png" onChange={async (event) => {
             const input = event.currentTarget;
             const file = input.files?.[0];
             const version = ++selection.current;

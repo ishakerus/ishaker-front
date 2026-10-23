@@ -29,13 +29,13 @@ type ProductLineFormProps = {
   cupSelector?: ReactNode;
   duplicateSuggestion?: ReactNode;
   error?: string;
-  canBeAddedToHint?: string;
-  canBeAddedToIds?: string[];
-  canBeAddedToOptions?: RelationMultiSelectOption[];
+  cannotBeAddedToHint?: string;
+  cannotBeAddedToIds?: string[];
+  cannotBeAddedToOptions?: RelationMultiSelectOption[];
   canEditMixRules?: boolean;
   isSubmitting: boolean;
   onBaseProductLineChange: (value: string) => void;
-  onCanBeAddedToChange?: (value: string[]) => void;
+  onCannotBeAddedToChange?: (value: string[]) => void;
   onCustomSplashChange: (value: string) => void;
   onSubmit: FormEventHandler<HTMLFormElement>;
   splashOptions: SearchableImageOption[];
@@ -51,13 +51,13 @@ export function ProductLineForm({
   cupSelector,
   duplicateSuggestion,
   error,
-  canBeAddedToHint,
-  canBeAddedToIds = [],
-  canBeAddedToOptions = [],
+  cannotBeAddedToHint,
+  cannotBeAddedToIds = [],
+  cannotBeAddedToOptions = [],
   canEditMixRules = false,
   isSubmitting,
   onBaseProductLineChange,
-  onCanBeAddedToChange,
+  onCannotBeAddedToChange,
   onCustomSplashChange,
   onSubmit,
   splashOptions,
@@ -93,23 +93,24 @@ export function ProductLineForm({
 
         {canEditMixRules ? (
           <FormControl>
-            <FormLabel>Can be added to</FormLabel>
+            <FormLabel>Cannot be added to</FormLabel>
             <RelationMultiSelect
-              ariaLabel="Select product lines this line can be added to"
-              emptyLabel="No other template product lines are available."
-              options={canBeAddedToOptions}
-              value={canBeAddedToIds}
-              onChange={(value) => onCanBeAddedToChange?.(value)}
-              placeholder="Select destination product lines"
+              ariaLabel="Select product lines this line cannot be added to"
+              emptyLabel="No product lines are available."
+              options={cannotBeAddedToOptions}
+              value={cannotBeAddedToIds}
+              onChange={(value) => onCannotBeAddedToChange?.(value)}
+              placeholder="No exclusions — allow all product lines"
             />
             <FormHelperText>
-              Products from this line may be poured into products from the selected lines.
+              All product lines are allowed except those selected. Select this
+              line to block mixing within the same line.
             </FormHelperText>
           </FormControl>
-        ) : canBeAddedToHint ? (
+        ) : cannotBeAddedToHint ? (
           <HStack align="start" spacing="2">
             <Text color="bg.300" fontSize="sm">
-              Can be added to: {canBeAddedToHint}
+              Cannot be added to: {cannotBeAddedToHint}
             </Text>
           </HStack>
         ) : null}

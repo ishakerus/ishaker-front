@@ -10,6 +10,10 @@ import { useRouter } from "next/router";
 import { FormEvent, useEffect, useMemo, useRef, useState } from "react";
 import useSWR from "swr";
 import { capitalizeName } from "../../../../lib/formatName";
+import {
+  ADDON_PRICE_ERROR,
+  isValidAddonPrice,
+} from "../../../../lib/portal/addonPrice";
 import { getMediaUrl, getSmallestMediaUrl } from "../../../../lib/portal/media";
 import { getStrapiBaseUrl } from "../../../../services/fetchers";
 import type {
@@ -92,18 +96,24 @@ const planogramWarnings = (checks: PlanogramCheck[] = []) =>
     const warnings = Array.isArray(payload.warnings) ? payload.warnings : [];
 
     return [
-      ...missing.map((key: unknown) => `${machine}: missing artwork ${String(key)}`),
+      ...missing.map(
+        (key: unknown) => `${machine}: missing artwork ${String(key)}`,
+      ),
       ...problems.map(
         (problem: any) =>
           `${machine}: ${problem?.detail || problem?.code || "planogram problem"}`,
       ),
-      ...warnings.map((warning: any) =>
-        `${machine}: ${warning?.detail || warning?.message || String(warning)}`,
+      ...warnings.map(
+        (warning: any) =>
+          `${machine}: ${warning?.detail || warning?.message || String(warning)}`,
       ),
       ...(Number(check.status) >= 400 && !problems.length
         ? [
             `${machine}: ${
-              payload.message || payload.error?.message || payload.error || "planogram validation failed"
+              payload.message ||
+              payload.error?.message ||
+              payload.error ||
+              "planogram validation failed"
             }`,
           ]
         : []),
@@ -238,9 +248,7 @@ export function NewProductPage({
     error: allSplashOptionsError,
     isLoading: areAllSplashOptionsLoading,
   } = useSWR<{ splashes: PortalSplash[] }>(
-    splashDialog.isOpen
-      ? "/api/portal/visual-options?type=splashes"
-      : null,
+    splashDialog.isOpen ? "/api/portal/visual-options?type=splashes" : null,
     fetcher,
   );
   const {
@@ -248,9 +256,7 @@ export function NewProductPage({
     error: allTasteOptionsError,
     isLoading: areAllTasteOptionsLoading,
   } = useSWR<{ tastes: PortalTaste[] }>(
-    tasteMainDialog.isOpen
-      ? "/api/portal/visual-options?type=tastes"
-      : null,
+    tasteMainDialog.isOpen ? "/api/portal/visual-options?type=tastes" : null,
     fetcher,
   );
   const initialProduct = editingProduct || undefined;
@@ -262,9 +268,7 @@ export function NewProductPage({
   const [name, setName] = useState(
     initialProduct ? capitalizeName(initialProduct.name) : "",
   );
-  const [existingProductId, setExistingProductId] = useState(
-    editingProductId,
-  );
+  const [existingProductId, setExistingProductId] = useState(editingProductId);
   const [splashId, setSplashId] = useState(
     initialProduct?.custom_splash?.id
       ? String(initialProduct.custom_splash.id)
@@ -321,8 +325,20 @@ export function NewProductPage({
   const [isDependent, setIsDependent] = useState(
     initialProduct?.is_dependent === true,
   );
+  const [addonDosage, setAddonDosage] = useState(
+    initialProduct?.is_dependent && initialProduct.dosage?.product != null
+      ? String(initialProduct.dosage.product)
+      : "",
+  );
+  const [addonPrice, setAddonPrice] = useState(
+    initialProduct?.is_dependent && initialProduct.dosage?.full_drink_price != null
+      ? String(initialProduct.dosage.full_drink_price)
+      : "",
+  );
   const [canBeAddedToIds, setCanBeAddedToIds] = useState(
-    (initialProduct?.can_be_added_to || []).map((product) => String(product.id)),
+    (initialProduct?.can_be_added_to || []).map((product) =>
+      String(product.id),
+    ),
   );
   const [error, setError] = useState("");
   const hydratedProductDetailsId = useRef(
@@ -335,9 +351,10 @@ export function NewProductPage({
   const priceCurrencyId = session.client.currency?.id
     ? String(session.client.currency.id)
     : "";
-  const selectedProduct = templateProducts.find(
-    (product) => String(product.id) === existingProductId,
-  ) ||
+  const selectedProduct =
+    templateProducts.find(
+      (product) => String(product.id) === existingProductId,
+    ) ||
     (editingProduct && String(editingProduct.id) === existingProductId
       ? editingProduct
       : undefined);
@@ -367,6 +384,16 @@ export function NewProductPage({
     if (hydratedProductDetailsId.current !== existingProductId) {
       setComponentRows(toComponentRows(product));
       setDosage(toDosageValue(product));
+      if (product.is_dependent && product.dosage?.product != null) {
+        setAddonDosage(String(product.dosage.product));
+      }
+      if (product.is_dependent) {
+        setAddonPrice(
+          product.dosage?.full_drink_price != null
+            ? String(product.dosage.full_drink_price)
+            : "",
+        );
+      }
       hydratedProductDetailsId.current = existingProductId;
     }
 
@@ -400,7 +427,10 @@ export function NewProductPage({
   }, [existingProductId, selectedProductResponse]);
 
   const productOptions: ProductNameOption[] = templateProducts
-    .filter((product) => String(product.brand?.id) === brandId)
+    .filter(
+      (product) =>
+        String(product.brand?.id) === brandId && product.is_dependent !== true,
+    )
     .map((product) => ({
       id: String(product.id),
       name: capitalizeName(product.name),
@@ -460,14 +490,18 @@ export function NewProductPage({
     (taste) => String(taste.main?.id) === mainImageId,
   )?.main;
   const selectedBrand = brands.find((brand) => String(brand.id) === brandId);
-  const allowedLineIds = useMemo(
+  const blockedLineIds = useMemo(
     () =>
       new Set(
-        (productLine.base_product_line?.can_be_added_to || []).map((line) =>
-          String(line.id),
-        ),
+        [
+          ...(productLine.cannot_be_added_to || []),
+          ...(productLine.base_product_line?.cannot_be_added_to || []),
+        ].map((line) => String(line.id)),
       ),
-    [productLine.base_product_line?.can_be_added_to],
+    [
+      productLine.cannot_be_added_to,
+      productLine.base_product_line?.cannot_be_added_to,
+    ],
   );
   const eligibleCandidateProducts = useMemo(
     () =>
@@ -479,24 +513,32 @@ export function NewProductPage({
           String(candidate.id) !== editingProductId &&
           candidate.is_dependent !== true &&
           Boolean(candidateRootLineId) &&
-          allowedLineIds.has(String(candidateRootLineId))
+          (!blockedLineIds.has(String(candidateRootLineId)) ||
+            canBeAddedToIds.includes(String(candidate.id)))
         );
       }),
-    [allowedLineIds, candidateProducts, editingProductId],
+    [blockedLineIds, candidateProducts, editingProductId, canBeAddedToIds],
   );
   const canBeAddedToOptions = eligibleCandidateProducts.map((candidate) => {
+    const candidateRootLineId =
+      candidate.product_line?.base_product_line?.id || candidate.product_line?.id;
+    const isExcluded = blockedLineIds.has(String(candidateRootLineId));
+    const isSelected = canBeAddedToIds.includes(String(candidate.id));
     const hasReversePair = (candidate.can_be_added_to || []).some(
       (target) => String(target.id) === editingProductId,
     );
+    const note = isExcluded
+      ? "Excluded by product-line rules — remove this pairing."
+      : hasReversePair
+        ? "already added to this one"
+        : candidate.product_line?.name
+          ? capitalizeName(candidate.product_line.name)
+          : undefined;
     return {
       id: String(candidate.id),
       label: capitalizeName(candidate.name),
-      ...(candidate.product_line?.name
-        ? { note: hasReversePair ? "already added to this one" : capitalizeName(candidate.product_line.name) }
-        : hasReversePair
-          ? { note: "already added to this one" }
-          : {}),
-      isDisabled: hasReversePair,
+      ...(note ? { note } : {}),
+      isDisabled: (isExcluded || hasReversePair) && !isSelected,
     };
   });
   const mixPreview = canBeAddedToIds.flatMap((targetId) => {
@@ -504,8 +546,11 @@ export function NewProductPage({
       (candidate) => String(candidate.id) === targetId,
     );
     if (!target) return [];
+    const targetRootLineId =
+      target.product_line?.base_product_line?.id || target.product_line?.id;
+    if (blockedLineIds.has(String(targetRootLineId))) return [];
     const baseGrams = Number(target.dosage?.product);
-    const addonGrams = Number(dosage.product);
+    const addonGrams = Number(isDependent ? addonDosage : dosage.product);
     if (!(baseGrams > 0)) return [];
     if (isDependent) {
       return [
@@ -518,7 +563,7 @@ export function NewProductPage({
     return [
       `${capitalizeName(target.name)} ${(baseGrams * (1 - ratio / 100)).toFixed(1).replace(/\.0$/, "")} g + ${capitalizeName(
         name || "Add-on",
-      )} ${(baseGrams * ratio / 100).toFixed(1).replace(/\.0$/, "")} g at ${ratio}% (available: 20–80% in 10% steps)`,
+      )} ${((baseGrams * ratio) / 100).toFixed(1).replace(/\.0$/, "")} g at ${ratio}% (available: 20–80% in 10% steps)`,
     ];
   });
 
@@ -569,6 +614,12 @@ export function NewProductPage({
     if (!brandId) return "Select a brand.";
     if (name.trim().length < 2 || name.trim().length > 100) {
       return "Select or enter a product name between 2 and 100 characters.";
+    }
+    if (isDependent) {
+      if (!Number.isFinite(Number(addonDosage)) || Number(addonDosage) <= 0) {
+        return "Dosage must be greater than zero.";
+      }
+      return isValidAddonPrice(addonPrice) ? "" : ADDON_PRICE_ERROR;
     }
     if (!hasRequiredVisuals) {
       return "Select a splash, circle, and taste main image.";
@@ -649,7 +700,6 @@ export function NewProductPage({
         : "100",
     );
     setServingUnit(selected?.serving_unit === "ml" ? "ml" : "g");
-    setIsDependent(selected?.is_dependent === true);
     setCanBeAddedToIds([]);
     setComponentRows(toComponentRows(selected));
     setDosage(toDosageValue(selected));
@@ -708,51 +758,62 @@ export function NewProductPage({
             brandId,
             existingProductId: isEditing
               ? editingProductId
-              : existingProductId,
-            splashId,
-            circleId,
-            mainImageId,
-            cupId: validCupId(cupId),
-            components: componentRows.map(
-              ({
-                componentId,
-                isCustom,
-                name: componentName,
-                quantity,
-                unit,
-              }) => ({
-                componentId,
-                isCustom,
-                name: componentName,
-                quantity: Number(quantity),
-                unit,
-              }),
-            ),
-            description,
-            productType,
-            productPurpose,
-            servingQty: Number(servingQuantity),
-            servingUnit,
-            dosage: {
-              fullDrinkVolume: Number(dosage.drinkVolume),
-              fullDrinkPrice:
-                dosage.fullDrinkPrice === ""
-                  ? null
-                  : Number(dosage.fullDrinkPrice),
-              smallDrinkVolume:
-                dosage.smallDrinkVolume === ""
-                  ? null
-                  : Number(dosage.smallDrinkVolume),
-              smallDrinkPrice:
-                dosage.smallDrinkPrice === ""
-                  ? null
-                  : Number(dosage.smallDrinkPrice),
-              water: Number(dosage.water),
-              product: Number(dosage.product),
-              conversionFactor: Number(dosage.conversionFactor),
-            },
+              : isDependent
+                ? undefined
+                : existingProductId,
             isDependent,
             canBeAddedToIds,
+            ...(isDependent
+              ? {
+                  dosage: {
+                    product: Number(addonDosage),
+                    fullDrinkPrice: Number(addonPrice),
+                  },
+                }
+              : {
+                  splashId,
+                  circleId,
+                  mainImageId,
+                  cupId: validCupId(cupId),
+                  components: componentRows.map(
+                    ({
+                      componentId,
+                      isCustom,
+                      name: componentName,
+                      quantity,
+                      unit,
+                    }) => ({
+                      componentId,
+                      isCustom,
+                      name: componentName,
+                      quantity: Number(quantity),
+                      unit,
+                    }),
+                  ),
+                  description,
+                  productType,
+                  productPurpose,
+                  servingQty: Number(servingQuantity),
+                  servingUnit,
+                  dosage: {
+                    fullDrinkVolume: Number(dosage.drinkVolume),
+                    fullDrinkPrice:
+                      dosage.fullDrinkPrice === ""
+                        ? null
+                        : Number(dosage.fullDrinkPrice),
+                    smallDrinkVolume:
+                      dosage.smallDrinkVolume === ""
+                        ? null
+                        : Number(dosage.smallDrinkVolume),
+                    smallDrinkPrice:
+                      dosage.smallDrinkPrice === ""
+                        ? null
+                        : Number(dosage.smallDrinkPrice),
+                    water: Number(dosage.water),
+                    product: Number(dosage.product),
+                    conversionFactor: Number(dosage.conversionFactor),
+                  },
+                }),
           }),
         },
       );
@@ -806,7 +867,11 @@ export function NewProductPage({
   return (
     <PortalShell
       title={isEditing ? "Edit product" : "New product"}
-      description={`Edit what customers will see as one of ${productLineName} product line items (flavors).`}
+      description={
+        isDependent
+          ? `Configure an add-on for the ${productLineName} product line.`
+          : `Edit what customers will see as one of ${productLineName} product line items (flavors).`
+      }
       clientName={session.client.company}
       access={session.access}
     >
@@ -821,7 +886,11 @@ export function NewProductPage({
           componentRows={componentRows}
           components={components}
           description={description}
-          dosage={dosage}
+          dosage={
+            isDependent
+              ? { ...dosage, product: addonDosage, fullDrinkPrice: addonPrice }
+              : dosage
+          }
           error={error}
           formId={NEW_PRODUCT_FORM_ID}
           mainImageId={mainImageId}
@@ -839,7 +908,14 @@ export function NewProductPage({
             if (!isEditing) resetProductVisuals();
           }}
           onDescriptionChange={setDescription}
-          onDosageChange={setDosage}
+          onDosageChange={(value) => {
+            if (isDependent) {
+              setAddonDosage(value.product);
+              setAddonPrice(value.fullDrinkPrice);
+            } else {
+              setDosage(value);
+            }
+          }}
           onNameChange={(value) => {
             setName(value);
             if (!isEditing) resetProductVisuals();
@@ -888,64 +964,60 @@ export function NewProductPage({
           isDependent={isDependent}
           onIsDependentChange={(value) => {
             setIsDependent(value);
-            if (value) {
-              setDosage((current) => ({
-                ...current,
-                fullDrinkPrice: "",
-                smallDrinkPrice: "",
-                smallDrinkVolume: "",
-              }));
-            }
+            setError("");
           }}
           canBeAddedToIds={canBeAddedToIds}
           canBeAddedToOptions={canBeAddedToOptions}
           onCanBeAddedToChange={setCanBeAddedToIds}
-          mixAllowlistEmpty={allowedLineIds.size === 0}
           mixPreview={mixPreview}
         />
-        <NewProductVisualPreview
-          brand={selectedBrand}
-          circle={selectedCircle}
-          cup={selectedCup}
-          isSplashLoading={Boolean(
-            (existingProductId && isSelectedProductLoading) ||
-            (splashId && isSelectedSplashLoading),
-          )}
-          main={selectedMain}
-          productLineName={name || previewProduct?.name || productLineName}
-          splashError={Boolean(
-            (existingProductId && selectedProductError) ||
-            (splashId && selectedSplashError),
-          )}
-          splashFrames={splashFrames}
-          splashIsEmpty={
-            selectedSplashResponse?.splash.isEmpty ?? selectedSplash?.isEmpty
-          }
-        />
+        {!isDependent ? (
+          <NewProductVisualPreview
+            brand={selectedBrand}
+            circle={selectedCircle}
+            cup={selectedCup}
+            isSplashLoading={Boolean(
+              (existingProductId && isSelectedProductLoading) ||
+              (splashId && isSelectedSplashLoading),
+            )}
+            main={selectedMain}
+            productLineName={name || previewProduct?.name || productLineName}
+            splashError={Boolean(
+              (existingProductId && selectedProductError) ||
+              (splashId && selectedSplashError),
+            )}
+            splashFrames={splashFrames}
+            splashIsEmpty={
+              selectedSplashResponse?.splash.isEmpty ?? selectedSplash?.isEmpty
+            }
+          />
+        ) : null}
       </SimpleGrid>
 
-      <NewProductSelectionDialogs
-        isMainImageOpen={tasteMainDialog.isOpen}
-        isMainImageLoading={areAllTasteOptionsLoading}
-        isSplashOpen={splashDialog.isOpen}
-        isSplashLoading={areAllSplashOptionsLoading}
-        mainImageError={Boolean(allTasteOptionsError)}
-        mainImageId={mainImageId}
-        onCloseMainImage={tasteMainDialog.onClose}
-        onCloseSplash={splashDialog.onClose}
-        onSelectMainImage={(id) => {
-          setMainImageId(id);
-          tasteMainDialog.onClose();
-        }}
-        onSelectSplash={(id) => {
-          setSplashId(id);
-          splashDialog.onClose();
-        }}
-        splashId={splashId}
-        splashError={Boolean(allSplashOptionsError)}
-        splashes={allSplashOptions?.splashes || []}
-        tastes={allTasteOptions?.tastes || []}
-      />
+      {!isDependent ? (
+        <NewProductSelectionDialogs
+          isMainImageOpen={tasteMainDialog.isOpen}
+          isMainImageLoading={areAllTasteOptionsLoading}
+          isSplashOpen={splashDialog.isOpen}
+          isSplashLoading={areAllSplashOptionsLoading}
+          mainImageError={Boolean(allTasteOptionsError)}
+          mainImageId={mainImageId}
+          onCloseMainImage={tasteMainDialog.onClose}
+          onCloseSplash={splashDialog.onClose}
+          onSelectMainImage={(id) => {
+            setMainImageId(id);
+            tasteMainDialog.onClose();
+          }}
+          onSelectSplash={(id) => {
+            setSplashId(id);
+            splashDialog.onClose();
+          }}
+          splashId={splashId}
+          splashError={Boolean(allSplashOptionsError)}
+          splashes={allSplashOptions?.splashes || []}
+          tastes={allTasteOptions?.tastes || []}
+        />
+      ) : null}
       <HStack spacing="3" mt="4" justify="flex-start">
         <Button
           type="submit"

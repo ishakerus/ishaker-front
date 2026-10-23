@@ -1,3 +1,4 @@
+import { fetchJsonWithTimeout } from "../../lib/http/fetchJsonWithTimeout";
 import { supportContext } from "../../lib/admin/context";
 import { canSupportWriteStrapi } from "../../lib/admin/permissions";
 import fs from "fs";
@@ -107,7 +108,7 @@ const requestGraphql = async <T = any>(
   variables?: Record<string, any>,
   jwt?: string,
 ) => {
-  const response = await fetch(`${getStrapiBaseUrl()}/graphql`, {
+  const { response, payload } = await fetchJsonWithTimeout(`${getStrapiBaseUrl()}/graphql`, {
     method: "POST",
     headers: {
       "content-type": "application/json",
@@ -115,13 +116,12 @@ const requestGraphql = async <T = any>(
     },
     body: JSON.stringify({ query, variables }),
   });
-  const payload = await response.json();
 
   if (payload?.data && typeof payload.data === "object") {
     return payload.data as T;
   }
 
-  if (!response.ok || payload.errors?.length) {
+  if (!response.ok || !payload || payload.errors?.length) {
     const error = new Error("Strapi GraphQL request failed") as Error & {
       response?: typeof payload;
       status?: number;
@@ -139,7 +139,7 @@ const loginToStrapi = async () => {
   let lastStatus = 0;
 
   for (const { identifier, password } of candidates) {
-    const response = await fetch(`${getStrapiBaseUrl()}/api/auth/local`, {
+    const { response, payload } = await fetchJsonWithTimeout(`${getStrapiBaseUrl()}/api/auth/local`, {
       method: "POST",
       headers: { "content-type": "application/json" },
       body: JSON.stringify({
@@ -148,7 +148,6 @@ const loginToStrapi = async () => {
         provider: AUTH_PROVIDER,
       }),
     });
-    const payload = await response.json().catch(() => null);
     const jwt = payload?.jwt;
     lastStatus = response.status;
 
@@ -209,16 +208,16 @@ const requestStrapiRest = async <T = any>(
 ) => {
   const isMultipart =
     typeof FormData !== "undefined" && init?.body instanceof FormData;
+  const isRead = ["GET", "HEAD"].includes((init?.method || "GET").toUpperCase());
 
-  const response = await fetch(`${getStrapiBaseUrl()}${path}`, {
+  const { response, payload } = await fetchJsonWithTimeout(`${getStrapiBaseUrl()}${path}`, {
     ...init,
     headers: {
       ...(!isMultipart ? { "content-type": "application/json" } : {}),
       ...(jwt ? { Authorization: `Bearer ${jwt}` } : {}),
       ...(init?.headers || {}),
     },
-  });
-  const payload = await response.json().catch(() => null);
+  }, isRead ? 15_000 : 120_000);
 
   if (!response.ok || payload?.error) {
     const error = new Error("Strapi REST request failed") as Error & {

@@ -1,3 +1,4 @@
+import { fetchJsonWithTimeout } from "../http/fetchJsonWithTimeout";
 import { useRouter } from "next/router";
 import { useEffect } from "react";
 import useSWR from "swr";
@@ -24,11 +25,18 @@ export class PortalPageError extends Error {
 }
 
 const fetchPortalPage = async <T,>(url: string): Promise<T> => {
-  const response = await fetch(url, {
+  const { response, payload } = await fetchJsonWithTimeout(url, {
     cache: "no-store",
     credentials: "same-origin",
+  }, 30_000).catch((error) => {
+    if (error.status === 504) {
+      throw new PortalPageError(504, {
+        error: "request_timeout",
+        message: "This page is taking too long to load. Please try again.",
+      });
+    }
+    throw error;
   });
-  const payload = await response.json().catch(() => null);
   if (!response.ok) {
     throw new PortalPageError(response.status, payload);
   }

@@ -150,7 +150,7 @@ const createRootProductLineParams = (includeEditorFields = false) => {
   params.set("fields[1]", "isPopular");
   if (includeEditorFields) {
     params.set("fields[2]", "is_template");
-    params.set("populate[can_be_added_to][fields][0]", "name");
+    params.set("populate[cannot_be_added_to][fields][0]", "name");
     params.set("populate[cups][populate][image]", "*");
     params.set(
       "populate[cups][populate][default_splash][populate][images]",
@@ -379,9 +379,9 @@ export const loadEditProductLinePage = async (
   ownParams.set("populate[base_product_line][fields][0]", "name");
   ownParams.set("fields[0]", "name");
   ownParams.set("fields[1]", "is_template");
-  ownParams.set("populate[can_be_added_to][fields][0]", "name");
+  ownParams.set("populate[cannot_be_added_to][fields][0]", "name");
   ownParams.set(
-    "populate[base_product_line][populate][can_be_added_to][fields][0]",
+    "populate[base_product_line][populate][cannot_be_added_to][fields][0]",
     "name",
   );
   ownParams.set("populate[cups][populate][image]", "*");
@@ -393,14 +393,14 @@ export const loadEditProductLinePage = async (
   ownParams.set("pagination[pageSize]", "2000");
 
   const templateParams = new URLSearchParams();
-  templateParams.set("filters[is_template][$eq]", "true");
+  templateParams.set("filters[base_product_line][id][$null]", "true");
   templateParams.set("fields[0]", "name");
   templateParams.set("fields[1]", "is_template");
-  templateParams.set("populate[can_be_added_to][fields][0]", "name");
+  templateParams.set("populate[cannot_be_added_to][fields][0]", "name");
   templateParams.set("sort[0]", "name:ASC");
   templateParams.set("pagination[pageSize]", "2000");
 
-  const [ownProductLines, rootProductLines, templateProductLines, splashes] =
+  const [ownProductLines, rootProductLines, mixProductLines, splashes] =
     await Promise.all([
       requestStrapiRestAsService<PortalProductLine[]>(
         `/api/product-lines?${ownParams.toString()}`,
@@ -420,7 +420,7 @@ export const loadEditProductLinePage = async (
     session,
     productLine: ownProductLines[0],
     rootProductLines,
-    templateProductLines,
+    mixProductLines,
     splashes,
   };
 };
@@ -440,8 +440,9 @@ const createProductEditorParams = (productLineId: string, session: PortalSession
   params.set("populate[cups][populate][image][fields][0]", "url");
   params.set("populate[cups][populate][image][fields][1]", "formats");
   params.set("populate[base_product_line][fields][0]", "name");
+  params.set("populate[cannot_be_added_to][fields][0]", "name");
   params.set(
-    "populate[base_product_line][populate][can_be_added_to][fields][0]",
+    "populate[base_product_line][populate][cannot_be_added_to][fields][0]",
     "name",
   );
   params.set(

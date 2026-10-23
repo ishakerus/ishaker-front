@@ -31,6 +31,47 @@ const response = () => ({ statusCode: 200, headers: {} as Record<string, any>, b
   status(code: number) { this.statusCode = code; return this; }, json(body: any) { this.body = body; return this; },
 });
 
+test('portal login separates backend outages and throttling from invalid credentials', async (t) => {
+  let mode: number | 'offline' = 'offline';
+  t.mock.method(globalThis, 'fetch', async () => {
+    if (mode === 'offline') throw new TypeError('fetch failed');
+    return new Response(JSON.stringify({}), {
+      status: mode,
+      headers: mode === 429 ? { 'Retry-After': '30' } : {},
+    });
+  });
+  const req = {
+    method: 'POST', headers: { host: 'localhost', origin: 'http://localhost' },
+    body: { identifier: 'outage-test@example.com', password: 'test-password' },
+    socket: { remoteAddress: '127.0.0.1' },
+  };
+  const key = loginAttemptKey(req as any, req.body.identifier);
+  try {
+    for (const failure of ['offline', 500, 502, 503, 200] as const) {
+      mode = failure;
+      for (let attempt = 0; attempt < 3; attempt++) {
+        const res = response();
+        await portalLoginHandler(req as any, res as any);
+        assert.equal(res.statusCode, 503);
+        assert.equal(res.body.error, 'portal_auth_unavailable');
+      }
+    }
+    assert.equal(isLoginRateLimited(key), false);
+    mode = 429;
+    const throttled = response();
+    await portalLoginHandler(req as any, throttled as any);
+    assert.equal(throttled.statusCode, 429);
+    assert.equal(throttled.headers['Retry-After'], '30');
+    mode = 400;
+    const invalid = response();
+    await portalLoginHandler(req as any, invalid as any);
+    assert.equal(invalid.statusCode, 401);
+    assert.equal(invalid.body.error, 'invalid_credentials');
+  } finally {
+    clearLoginFailures(key);
+  }
+});
+
 test('ADMIN_PASSWORD supports client-portal override but not dashboard authentication', async () => {
   const configuredSecret = process.env.ADMIN_SESSION_SECRET;
   const legacySecret = process.env.ADMIN_PASSWORD;

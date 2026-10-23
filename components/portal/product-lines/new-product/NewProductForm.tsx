@@ -2,12 +2,12 @@ import {
   Alert,
   AlertIcon,
   Box,
+  Button,
+  ButtonGroup,
   Divider,
   FormControl,
   FormLabel,
   FormHelperText,
-  HStack,
-  Switch,
   Text,
   Textarea,
   VStack,
@@ -19,6 +19,7 @@ import type {
   PortalProductType,
 } from "../../../../types/portal";
 import type { Currency } from "../../../../types/strapi";
+import { formatMoney, resolveCurrency } from "../../../../lib/portal/currency";
 import {
   ProductComponentsTable,
   type ProductComponentRow,
@@ -29,7 +30,7 @@ import {
   SearchableImageSelect,
   type SearchableImageOption,
 } from "../SearchableImageSelect";
-import { Help } from "../../../Help";
+import { AddonProductFields } from "./AddonProductFields";
 import {
   RelationMultiSelect,
   type RelationMultiSelectOption,
@@ -90,7 +91,6 @@ type NewProductFormProps = {
   canBeAddedToIds: string[];
   canBeAddedToOptions: RelationMultiSelectOption[];
   onCanBeAddedToChange: (value: string[]) => void;
-  mixAllowlistEmpty: boolean;
   mixPreview?: string[];
 };
 
@@ -145,9 +145,11 @@ export function NewProductForm({
   canBeAddedToIds,
   canBeAddedToOptions,
   onCanBeAddedToChange,
-  mixAllowlistEmpty,
   mixPreview = [],
 }: NewProductFormProps) {
+  const priceCurrency = resolveCurrency(
+    currencies.find((currency) => String(currency.id) === priceCurrencyId),
+  );
   return (
     <Box
       as="form"
@@ -162,6 +164,40 @@ export function NewProductForm({
       py={{ base: "5", md: "7" }}
     >
       <VStack spacing="5" align="stretch">
+        <FormControl>
+          <FormLabel>Product mode</FormLabel>
+          <ButtonGroup
+            isAttached
+            w="full"
+            role="group"
+            aria-label="Product mode"
+            aria-describedby="product-mode-help"
+          >
+            <Button
+              type="button"
+              flex="1"
+              variant={isDependent ? "outline" : "primary"}
+              aria-pressed={!isDependent}
+              onClick={() => onIsDependentChange(false)}
+            >
+              Drink
+            </Button>
+            <Button
+              type="button"
+              flex="1"
+              variant={isDependent ? "primary" : "outline"}
+              aria-pressed={isDependent}
+              onClick={() => onIsDependentChange(true)}
+            >
+              Add-on
+            </Button>
+          </ButtonGroup>
+          <FormHelperText id="product-mode-help">
+            Drinks can be ordered on their own. Add-ons, such as creatine, are
+            added to another drink at a fixed dose.
+          </FormHelperText>
+        </FormControl>
+
         <Box>
           <Text color="bg.300" fontSize="sm">
             Product line
@@ -171,148 +207,162 @@ export function NewProductForm({
           </Text>
         </Box>
 
-        <FormControl isRequired>
-          <FormLabel>Brand</FormLabel>
-          <SearchableImageSelect
-            ariaLabel="Select a brand"
-            emptyLabel="No brands found"
-            options={brandOptions}
-            placeholder="Select a brand"
-            value={brandId}
-            onChange={onBrandChange}
-          />
-        </FormControl>
-
-        <FormControl isRequired>
-          <FormLabel>Name</FormLabel>
-          <ProductNameSelect
-            value={name}
-            options={productOptions}
+        {isDependent ? (
+          <AddonProductFields
+            brandId={brandId}
+            brandOptions={brandOptions}
+            dosage={dosage.product}
+            price={dosage.fullDrinkPrice}
+            currencyCode={priceCurrency.code}
+            name={name}
+            onBrandChange={onBrandChange}
+            onDosageChange={(product) => onDosageChange({ ...dosage, product })}
             onNameChange={onNameChange}
-            onProductSelect={onProductSelect}
-            onCreateCustom={onCreateCustomProduct}
+            onPriceChange={(fullDrinkPrice) =>
+              onDosageChange({ ...dosage, fullDrinkPrice })
+            }
           />
-          {!brandId ? (
-            <Text color="bg.400" fontSize="sm" mt="2">
-              Select a brand first to see matching root products.
-            </Text>
-          ) : null}
-        </FormControl>
+        ) : (
+          <>
+            <FormControl isRequired>
+              <FormLabel>Brand</FormLabel>
+              <SearchableImageSelect
+                ariaLabel="Select a brand"
+                emptyLabel="No brands found"
+                options={brandOptions}
+                placeholder="Select a brand"
+                value={brandId}
+                onChange={onBrandChange}
+              />
+            </FormControl>
 
-        <FormControl isRequired>
-          <FormLabel>Splash</FormLabel>
-          <SearchableImageSelect
-            ariaLabel="Select a splash"
-            emptyLabel="No splashes found"
-            options={splashOptions}
-            placeholder="Select a splash"
-            value={splashId}
-            onChange={onVisualChange.splash}
-            onShowMore={onShowMoreSplashes}
-            showMoreLabel="See all"
-            createHref="/catalog"
-          />
-        </FormControl>
+            <FormControl isRequired>
+              <FormLabel>Name</FormLabel>
+              <ProductNameSelect
+                value={name}
+                options={productOptions}
+                onNameChange={onNameChange}
+                onProductSelect={onProductSelect}
+                onCreateCustom={onCreateCustomProduct}
+              />
+              {!brandId ? (
+                <Text color="bg.400" fontSize="sm" mt="2">
+                  Select a brand first to see matching root products.
+                </Text>
+              ) : null}
+            </FormControl>
 
-        <FormControl isRequired>
-          <FormLabel>Circle</FormLabel>
-          <SearchableImageSelect
-            ariaLabel="Select a circle"
-            emptyLabel="No circles found"
-            options={circleOptions}
-            placeholder="Select a circle"
-            value={circleId}
-            onChange={onVisualChange.circle}
-          />
-        </FormControl>
+            <FormControl isRequired>
+              <FormLabel>Splash</FormLabel>
+              <SearchableImageSelect
+                ariaLabel="Select a splash"
+                emptyLabel="No splashes found"
+                options={splashOptions}
+                placeholder="Select a splash"
+                value={splashId}
+                onChange={onVisualChange.splash}
+                onShowMore={onShowMoreSplashes}
+                showMoreLabel="See all"
+                createHref="/catalog"
+              />
+            </FormControl>
 
-        <FormControl isRequired>
-          <FormLabel>Taste main image</FormLabel>
-          <SearchableImageSelect
-            ariaLabel="Select a taste main image"
-            emptyLabel="No taste main images found"
-            options={mainImageOptions}
-            placeholder="Select a taste main image"
-            value={mainImageId}
-            onChange={onVisualChange.mainImage}
-            onShowMore={onShowMoreMainImages}
-          />
-        </FormControl>
+            <FormControl isRequired>
+              <FormLabel>Circle</FormLabel>
+              <SearchableImageSelect
+                ariaLabel="Select a circle"
+                emptyLabel="No circles found"
+                options={circleOptions}
+                placeholder="Select a circle"
+                value={circleId}
+                onChange={onVisualChange.circle}
+              />
+            </FormControl>
 
-        <FormControl>
-          <FormLabel>Custom cup</FormLabel>
-          <SearchableImageSelect
-            ariaLabel="Select a custom cup"
-            emptyLabel="No cups are available for this product line"
-            options={cupOptions}
-            placeholder="Select a cup"
-            value={cupId}
-            onChange={onCupChange}
-            clearLabel="Use product-line default cup"
-            isSearchable={false}
-            optionLayout="tiles"
-            fallbackOption={defaultCup}
-          />
-          <Text color="bg.400" fontSize="sm" mt="2">
-            Optional. Only cups belonging to this product line are available.
-          </Text>
-        </FormControl>
+            <FormControl isRequired>
+              <FormLabel>Taste main image</FormLabel>
+              <SearchableImageSelect
+                ariaLabel="Select a taste main image"
+                emptyLabel="No taste main images found"
+                options={mainImageOptions}
+                placeholder="Select a taste main image"
+                value={mainImageId}
+                onChange={onVisualChange.mainImage}
+                onShowMore={onShowMoreMainImages}
+              />
+            </FormControl>
 
-        <FormControl>
-          <FormLabel>Description</FormLabel>
-          <Textarea
-            value={description}
-            onChange={(event) => onDescriptionChange(event.target.value)}
-            maxLength={2000}
-            placeholder="Optional product description"
-            bg="bg.800"
-          />
-        </FormControl>
+            <FormControl>
+              <FormLabel>Custom cup</FormLabel>
+              <SearchableImageSelect
+                ariaLabel="Select a custom cup"
+                emptyLabel="No cups are available for this product line"
+                options={cupOptions}
+                placeholder="Select a cup"
+                value={cupId}
+                onChange={onCupChange}
+                clearLabel="Use product-line default cup"
+                isSearchable={false}
+                optionLayout="tiles"
+                fallbackOption={defaultCup}
+              />
+              <Text color="bg.400" fontSize="sm" mt="2">
+                Optional. Only cups belonging to this product line are
+                available.
+              </Text>
+            </FormControl>
+
+            <FormControl>
+              <FormLabel>Description</FormLabel>
+              <Textarea
+                value={description}
+                onChange={(event) => onDescriptionChange(event.target.value)}
+                maxLength={2000}
+                placeholder="Optional product description"
+                bg="bg.800"
+              />
+            </FormControl>
+
+            <Divider />
+
+            <ProductComponentsTable
+              components={components}
+              dosage={dosage}
+              rows={componentRows}
+              onChange={onComponentRowsChange}
+              onDosageChange={onDosageChange}
+              onProductPurposeChange={onProductPurposeChange}
+              onProductTypeChange={onProductTypeChange}
+              onServingQuantityChange={onServingQuantityChange}
+              onServingUnitChange={onServingUnitChange}
+              servingQuantity={servingQuantity}
+              servingUnit={servingUnit}
+              productPurpose={productPurpose}
+              productType={productType}
+              currencies={currencies}
+              canEditMachineCurrency={canEditMachineCurrency}
+              priceCurrencyId={priceCurrencyId}
+              isCurrencySaving={isCurrencySaving}
+              onPriceCurrencyChange={onPriceCurrencyChange}
+            />
+          </>
+        )}
 
         <Divider />
 
         <FormControl>
-          <HStack justify="space-between" align="center">
-            <HStack spacing="1">
-              <FormLabel mb="0">Not a drink on its own (add-on only)</FormLabel>
-              <Help text="If it's ON then it will be only an addition to other drinks. If it's OFF then it can be ordered as a standalone drink. For example: pure creatine powder can not be a separated drink but can be an addon. But protein powder can be." />
-            </HStack>
-            <Switch
-              aria-label="Not a drink on its own (add-on only)"
-              isChecked={isDependent}
-              onChange={(event) => onIsDependentChange(event.target.checked)}
-              colorScheme="green"
-            />
-          </HStack>
-        </FormControl>
-
-        <FormControl>
           <FormLabel>Can be added to</FormLabel>
-          {mixAllowlistEmpty ? (
-            <Box
-              border="1px dashed"
-              borderColor="whiteAlpha.300"
-              borderRadius="lg"
-              px="4"
-              py="3"
-            >
-              <Text color="bg.300" fontSize="sm">
-                This product line can&apos;t be added to other drinks. Ask
-                iShaker support.
-              </Text>
-            </Box>
-          ) : (
-            <RelationMultiSelect
-              ariaLabel="Select drinks this product can be added to"
-              emptyLabel="No eligible drinks are available yet."
-              options={canBeAddedToOptions}
-              value={canBeAddedToIds}
-              onChange={onCanBeAddedToChange}
-              placeholder="Select base drinks"
-            />
-          )}
+          <RelationMultiSelect
+            ariaLabel="Select drinks this product can be added to"
+            emptyLabel="No eligible drinks are available yet."
+            options={canBeAddedToOptions}
+            value={canBeAddedToIds}
+            onChange={onCanBeAddedToChange}
+            placeholder="Select base drinks"
+          />
           <FormHelperText>
-            Only eligible drinks from your own library are shown.
+            Choose eligible drinks from your library. Both products must be in
+            active containers on the same machine for the mix to be available.
           </FormHelperText>
           {mixPreview.length ? (
             <Box mt="3" bg="whiteAlpha.50" borderRadius="lg" p="3">
@@ -325,35 +375,13 @@ export function NewProductForm({
                 </Text>
               ))}
               <Text color="acid.300" fontSize="sm" mt="1">
-                Price: same as the base drink
+                {isDependent
+                  ? `Price: base drink + ${formatMoney(dosage.fullDrinkPrice, priceCurrency)} per dose`
+                  : "Price: same as the base drink"}
               </Text>
             </Box>
           ) : null}
         </FormControl>
-
-        <Divider />
-
-        <ProductComponentsTable
-          components={components}
-          dosage={dosage}
-          rows={componentRows}
-          onChange={onComponentRowsChange}
-          onDosageChange={onDosageChange}
-          onProductPurposeChange={onProductPurposeChange}
-          onProductTypeChange={onProductTypeChange}
-          onServingQuantityChange={onServingQuantityChange}
-          onServingUnitChange={onServingUnitChange}
-          servingQuantity={servingQuantity}
-          servingUnit={servingUnit}
-          productPurpose={productPurpose}
-          productType={productType}
-          currencies={currencies}
-          canEditMachineCurrency={canEditMachineCurrency}
-          priceCurrencyId={priceCurrencyId}
-          isCurrencySaving={isCurrencySaving}
-          onPriceCurrencyChange={onPriceCurrencyChange}
-          isDependent={isDependent}
-        />
 
         {error ? (
           <Alert status="error" borderRadius="xl">
