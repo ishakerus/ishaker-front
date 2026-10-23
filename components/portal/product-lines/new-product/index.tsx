@@ -120,40 +120,43 @@ const planogramWarnings = (checks: PlanogramCheck[] = []) =>
     ];
   });
 
-const toDosageValue = (product?: PortalProduct): ProductDosageValue => ({
+const toDosageValue = (
+  product?: PortalProduct,
+  useDefaults = true,
+): ProductDosageValue => ({
   drinkVolume:
     product?.dosage?.full_drink_volume !== undefined &&
     product.dosage.full_drink_volume !== null
       ? String(product.dosage.full_drink_volume)
-      : DEFAULT_DOSAGE.drinkVolume,
+      : useDefaults ? DEFAULT_DOSAGE.drinkVolume : "",
   fullDrinkPrice:
     product?.dosage?.full_drink_price !== undefined &&
     product.dosage.full_drink_price !== null
       ? String(product.dosage.full_drink_price)
-      : DEFAULT_DOSAGE.fullDrinkPrice,
+      : useDefaults ? DEFAULT_DOSAGE.fullDrinkPrice : "",
   smallDrinkVolume:
     product?.dosage?.small_drink_volume !== undefined &&
     product.dosage.small_drink_volume !== null
       ? String(product.dosage.small_drink_volume)
-      : DEFAULT_DOSAGE.smallDrinkVolume,
+      : useDefaults ? DEFAULT_DOSAGE.smallDrinkVolume : "",
   smallDrinkPrice:
     product?.dosage?.small_drink_price !== undefined &&
     product.dosage.small_drink_price !== null
       ? String(product.dosage.small_drink_price)
-      : DEFAULT_DOSAGE.smallDrinkPrice,
+      : useDefaults ? DEFAULT_DOSAGE.smallDrinkPrice : "",
   water:
     product?.dosage?.water !== undefined && product.dosage.water !== null
       ? String(product.dosage.water)
-      : DEFAULT_DOSAGE.water,
+      : useDefaults ? DEFAULT_DOSAGE.water : "",
   product:
     product?.dosage?.product !== undefined && product.dosage.product !== null
       ? String(product.dosage.product)
-      : DEFAULT_DOSAGE.product,
+      : useDefaults ? DEFAULT_DOSAGE.product : "",
   conversionFactor:
     product?.dosage?.conversion_factor !== undefined &&
     product.dosage.conversion_factor !== null
       ? String(product.dosage.conversion_factor)
-      : DEFAULT_DOSAGE.conversionFactor,
+      : useDefaults ? DEFAULT_DOSAGE.conversionFactor : "",
 });
 
 const toComponentRows = (product?: PortalProduct): ProductComponentRow[] => {
@@ -299,7 +302,7 @@ export function NewProductPage({
     toComponentRows(initialProduct),
   );
   const [dosage, setDosage] = useState<ProductDosageValue>(
-    toDosageValue(initialProduct),
+    toDosageValue(initialProduct, !isEditing),
   );
   const [description, setDescription] = useState(
     initialProduct?.description || "",
@@ -383,7 +386,7 @@ export function NewProductPage({
 
     if (hydratedProductDetailsId.current !== existingProductId) {
       setComponentRows(toComponentRows(product));
-      setDosage(toDosageValue(product));
+      setDosage(toDosageValue(product, !isEditing));
       if (product.is_dependent && product.dosage?.product != null) {
         setAddonDosage(String(product.dosage.product));
       }
@@ -424,7 +427,7 @@ export function NewProductPage({
             ? String(taste.main.id)
             : ""),
     );
-  }, [existingProductId, selectedProductResponse]);
+  }, [existingProductId, isEditing, selectedProductResponse]);
 
   const productOptions: ProductNameOption[] = templateProducts
     .filter(
@@ -697,7 +700,7 @@ export function NewProductPage({
     setServingUnit(selected?.serving_unit === "ml" ? "ml" : "g");
     setCanBeAddedToIds([]);
     setComponentRows(toComponentRows(selected));
-    setDosage(toDosageValue(selected));
+    setDosage(toDosageValue(selected, !isEditing));
     setSplashId(
       selected?.custom_splash?.id
         ? String(selected.custom_splash.id)
