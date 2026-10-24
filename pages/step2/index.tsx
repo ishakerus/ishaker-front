@@ -22,6 +22,10 @@ import { getIsoCurrencies } from "../../lib/portal/isoCurrencies";
 import type { GetServerSideProps } from "next";
 import { requestStrapiRestAsService } from "../../services/server/strapiClient";
 import type { Currency } from "../../types/strapi";
+import {
+  getDefaultMachineTitle,
+  MACHINE_TITLE_MAX_LENGTH,
+} from "../../lib/portal/machineName";
 
 type Step2PageProps = { currencies: Currency[] };
 
@@ -36,7 +40,7 @@ export default function Step2Page({ currencies }: Step2PageProps) {
   const [state, setState] = useState("");
   const [city, setCity] = useState("");
   const [notes, setNotes] = useState("");
-  const [machineLabel, setMachineLabel] = useState("");
+  const [machineTitle, setMachineTitle] = useState("");
   const [serialNumber, setSerialNumber] = useState("");
   const [currencyId, setCurrencyId] = useState("");
 
@@ -52,7 +56,12 @@ export default function Step2Page({ currencies }: Step2PageProps) {
     setState(draft.state || "");
     setCity(draft.city || "");
     setNotes(draft.notes || "");
-    setMachineLabel(draft.machineTitle || "Selected machine");
+    setMachineTitle(
+      draft.machineTitle ||
+        (draft.machineId
+          ? getDefaultMachineTitle(draft.machineId, draft.machineTypeName)
+          : ""),
+    );
     setSerialNumber(draft.serialNumber);
     const defaultCurrency =
       currencies.find((currency) => currency.code?.toUpperCase() === "USD") ||
@@ -70,6 +79,7 @@ export default function Step2Page({ currencies }: Step2PageProps) {
       state,
       city,
       notes,
+      machineTitle: machineTitle.trim(),
       currencyId,
       currencyCode: currencies.find((currency) => String(currency.id) === currencyId)?.code,
       currencySymbol: currencies.find((currency) => String(currency.id) === currencyId)?.symbol || undefined,
@@ -90,7 +100,7 @@ export default function Step2Page({ currencies }: Step2PageProps) {
             <CustomTitle
               as="h1"
               title="Confirm the machine and location"
-              subtitle="The nickname identifies the owner. Location data is used to name and manage the machine."
+              subtitle="Choose a machine name and confirm its location."
               fontSize={{ base: "3xl", md: "4xl" }}
               textAlign="left"
               mt="0"
@@ -101,8 +111,16 @@ export default function Step2Page({ currencies }: Step2PageProps) {
 
           <VStack spacing="6" align="stretch">
             <Box bg={panelBg} border="1px solid" borderColor={borderColor} borderRadius="2xl" p="6">
-              <Text color="bg.50" fontWeight="700">{machineLabel}</Text>
-              <Text color={muted} mt="1">Serial number: {serialNumber}</Text>
+              <FormControl isRequired>
+                <FormLabel>Machine name</FormLabel>
+                <Input
+                  value={machineTitle}
+                  onChange={(event) => setMachineTitle(event.target.value)}
+                  maxLength={MACHINE_TITLE_MAX_LENGTH}
+                />
+                <FormHelperText>You can change this name before registering.</FormHelperText>
+              </FormControl>
+              <Text color={muted} mt="3">Serial number: {serialNumber}</Text>
             </Box>
 
             <Box bg={panelBg} border="1px solid" borderColor={borderColor} borderRadius="2xl" p="6">
@@ -166,7 +184,7 @@ export default function Step2Page({ currencies }: Step2PageProps) {
               alignSelf="flex-start"
               variant="primary"
               onClick={handleNext}
-              isDisabled={!nickname || !country || !state || !city || !currencyId}
+              isDisabled={!machineTitle.trim() || !nickname || !country || !state || !city || !currencyId}
             >
               Continue
             </Button>

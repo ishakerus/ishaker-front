@@ -25,6 +25,10 @@ import {
   getIsoCodeFromVirtualId,
   getIsoCurrency,
 } from "../../../lib/portal/isoCurrencies";
+import {
+  getDefaultMachineTitle,
+  MACHINE_TITLE_MAX_LENGTH,
+} from "../../../lib/portal/machineName";
 
 const asString = (value: unknown) => (typeof value === "string" ? value.trim() : "");
 const WHATSAPP_COUNTRY_CODE_REGEX = /^\+[1-9]\d{0,3}$/;
@@ -233,6 +237,10 @@ async function handler(req: NextApiRequest, res: NextApiResponse) {
   const password = asString(req.body?.password);
   const passwordConfirmation = asString(req.body?.passwordConfirmation);
   const currencyId = asString(req.body?.currencyId);
+  const machineTitle =
+    req.body?.machineTitle === undefined
+      ? undefined
+      : asString(req.body.machineTitle);
 
   if (!serialNumber || !nickname || !country || !state || !city || !currencyId) {
     return res.status(400).json({
@@ -245,6 +253,16 @@ async function handler(req: NextApiRequest, res: NextApiResponse) {
     return res.status(400).json({
       error: "invalid_serial_number",
       message: "Serial number must contain digits only.",
+    });
+  }
+
+  if (
+    machineTitle !== undefined &&
+    (!machineTitle || machineTitle.length > MACHINE_TITLE_MAX_LENGTH)
+  ) {
+    return res.status(400).json({
+      error: "invalid_machine_title",
+      message: `Machine name must contain 1–${MACHINE_TITLE_MAX_LENGTH} characters.`,
     });
   }
 
@@ -468,7 +486,9 @@ async function handler(req: NextApiRequest, res: NextApiResponse) {
     assignedMachine = await updateMachineRegistrationData({
       client,
       machine: matchedMachine,
-      nickname,
+      title:
+        machineTitle ??
+        getDefaultMachineTitle(matchedMachine.id, matchedMachine.machine_type?.name),
       country,
       stateRegion: state,
       city,

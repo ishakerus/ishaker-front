@@ -137,7 +137,6 @@ async function handler(
       ? await updateMachineRegistrationData({
           client: session.client,
           machine,
-          nickname: session.client.company,
           country,
           stateRegion,
           city,

@@ -30,6 +30,7 @@ import CustomTitle from "../home/CutsomTitle";
 import Loader from "../shared/Loader";
 import { WHATSAPP_SUPPORT_URL } from "../../lib/portal/support";
 import { getMachineSerialBase } from "../../lib/portal/machineSerial";
+import { getDefaultMachineTitle } from "../../lib/portal/machineName";
 
 const SERIAL_DEBOUNCE_MS = 3000;
 
@@ -123,13 +124,21 @@ export function SerialNumberSection({
   };
 
   const handleNext = () => {
-    if (!canContinue) return;
+    if (!canContinue || !selectedMachine) return;
+    const draft = loadRegistrationDraft();
+    const defaultTitle = getDefaultMachineTitle(
+      selectedMachine.id,
+      selectedMachine.machine_type?.name,
+    );
     mergeRegistrationDraft({
-      machineId: selectedMachine?.id,
+      machineId: selectedMachine.id,
       serialNumber: getMachineSerialBase(
         selectedMachine?.serial_number || trimmedSerial,
       ),
-      machineTitle: selectedMachine?.title,
+      machineTitle:
+        String(draft?.machineId) === String(selectedMachine.id)
+          ? draft?.machineTitle || defaultTitle
+          : defaultTitle,
       machineTypeName: selectedMachine?.machine_type?.name,
       ...(existingAccount
         ? {
@@ -233,7 +242,10 @@ export function SerialNumberSection({
             {selectedMachine ? (
               <VStack spacing="1" mt="4" align="stretch">
                 <Text color={headingColor} fontWeight="700">
-                  {selectedMachine.title || "Machine found"}
+                  {getDefaultMachineTitle(
+                    selectedMachine.id,
+                    selectedMachine.machine_type?.name,
+                  )}
                 </Text>
                 <Text color={muted} fontSize="sm">
                   Serial: {selectedMachine.serial_number}
