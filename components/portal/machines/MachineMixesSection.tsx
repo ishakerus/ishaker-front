@@ -1,4 +1,5 @@
-import { Badge, Box, HStack, Text, VStack, Wrap, WrapItem } from "@chakra-ui/react";
+import { Badge, Box, HStack, Link, Text, VStack, Wrap, WrapItem } from "@chakra-ui/react";
+import NextLink from "next/link";
 import { getMachineMixes } from "../../../lib/portal/mix";
 import type { PortalMachineCell } from "../../../types/portal";
 
@@ -21,6 +22,9 @@ export function MachineMixesSection({ cells }: { cells: PortalMachineCell[] }) {
       <Text color="bg.400" fontSize="sm" mb="3">
         Both products must be in active containers for the mix to appear on the kiosk.
       </Text>
+      <Link as={NextLink} href="/articles/mix-tastes" color="acid.300" fontSize="sm" display="inline-block" mb="3">
+        How to mix tastes and add supplements
+      </Link>
       {mixes.length ? (
         <VStack align="stretch" spacing="2" mb={warnings.length ? "3" : "0"}>
           {mixes.map((mix) => (
