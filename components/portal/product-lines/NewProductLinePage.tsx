@@ -381,7 +381,7 @@ export function NewProductLinePage({
     <PortalShell
       title={isEditing ? "Edit product line" : "New product line"}
       description={`${isEditing ? "Update" : "Choose"} a product line and its default cup.`}
-      clientName={session.client.company}
+      clientName={session.client.company} billingEnabled={session.client.subscription_billing_enabled}
       access={session.access}
     >
       {loadError ? (

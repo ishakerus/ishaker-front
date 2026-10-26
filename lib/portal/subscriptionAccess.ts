@@ -1,5 +1,6 @@
 import type { NextApiRequest, NextApiResponse } from "next";
 import type { ClientBilling } from "../../types/billing";
+import type { Client } from "../../types/strapi";
 import { requestStrapiRestAsService } from "../../services/server/strapiClient";
 import { getPortalSessionFromApiRequest, readPortalJwt } from "./auth";
 import { isSharedAdminPortalToken } from "./adminAccess";
@@ -32,11 +33,15 @@ export function blockedSubscriptionMachines(billing: ClientBilling) {
   return billing.subscriptions.filter((sub) => !["active", "orange", "red"].includes(sub.status)).map((sub) => String(sub.machine_id));
 }
 
+export function shouldEnforceSubscriptionRestrictions(client: Pick<Client, "subscription_billing_enabled" | "subscription_restrictions_enabled">) {
+  return client.subscription_billing_enabled === true && client.subscription_restrictions_enabled !== false;
+}
+
 export async function guardSubscriptionWrite(req: NextApiRequest, res: NextApiResponse) {
   const target = subscriptionWriteTarget(req.method || "", (req.url || "").split("?")[0], req.body);
   if (!target) return false;
   const session = await getPortalSessionFromApiRequest(req);
-  if (!session || session.access !== "client" || !session.client.subscription_billing_enabled ||
+  if (!session || session.access !== "client" || !shouldEnforceSubscriptionRestrictions(session.client) ||
       session.support || isSharedAdminPortalToken(readPortalJwt(req.headers.cookie))) return false;
   try {
     const billing = await requestStrapiRestAsService<ClientBilling>(`/api/client-billing/${session.client.id}`);

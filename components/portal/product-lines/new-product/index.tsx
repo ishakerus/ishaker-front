@@ -894,7 +894,7 @@ export function NewProductPage({
           ? `Configure an add-on for the ${productLineName} product line.`
           : `Edit what customers will see as one of ${productLineName} product line items (flavors).`
       }
-      clientName={session.client.company}
+      clientName={session.client.company} billingEnabled={session.client.subscription_billing_enabled}
       access={session.access}
     >
       <SimpleGrid

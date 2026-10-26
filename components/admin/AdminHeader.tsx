@@ -19,6 +19,7 @@ import { useEffect, useState } from "react";
 
 const adminLinks = [
   ["/admin/dashboard", "Clients"],
+  ["/admin/subscriptions", "Subscriptions"],
   ["/admin/tickets", "Tickets"],
   ["/admin/patches", "Patches"],
   ["/admin/currencies", "Currencies"],

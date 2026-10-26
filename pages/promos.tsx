@@ -294,7 +294,7 @@ function PromosPage({
     <PortalShell
       title="Promos"
       description="Use promo codes to give discounts to your clients. "
-      clientName={session.client.company}
+      clientName={session.client.company} billingEnabled={session.client.subscription_billing_enabled}
     >
       <SimpleGrid columns={{ base: 1, xl: 2 }} spacing="6">
         <Box

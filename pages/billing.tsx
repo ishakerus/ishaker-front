@@ -72,11 +72,11 @@ export default function BillingPage({ session }: { session: PortalSession }) {
   }, [billing?.stripe.enabled, billing?.stripe.linked, action]);
 
   return (
-    <PortalShell title="Billing" description="Subscriptions and payments" clientName={session.client.company} access={session.access}>
+    <PortalShell title="Billing" description="Subscriptions and payments" clientName={session.client.company} billingEnabled={session.client.subscription_billing_enabled} access={session.access}>
       <HStack justify="space-between" mb="6" flexWrap="wrap" gap="3">
         <Box><Heading size="lg">Subscriptions & payments</Heading><Text mt="2" color="whiteAlpha.700">Service for your machines, billed every 30 days.</Text></Box>
         <HStack>
-          <Badge colorScheme={billing?.stripe.test_mode === false ? "green" : "purple"}>{billing ? (billing.stripe.test_mode ? "Stripe test mode" : "Live billing") : "Billing"}</Badge>
+          <Badge colorScheme={billing?.stripe.test_mode === false ? "green" : "purple"}>{billing ? (!billing.stripe.enabled ? "Administrator-managed access" : billing.stripe.test_mode ? "Stripe test mode" : "Live billing") : "Billing"}</Badge>
           <Button size="sm" isDisabled={!billing?.stripe.enabled || !billing.stripe.linked || Boolean(busy)} isLoading={busy === "sync"} onClick={() => void action("sync")}>Refresh payments</Button>
           <Button size="sm" isDisabled={!billing?.stripe.enabled || !billing.stripe.linked || Boolean(busy)} isLoading={busy === "portal"} onClick={() => void action("portal")}>Manage billing</Button>
         </HStack>
@@ -84,8 +84,8 @@ export default function BillingPage({ session }: { session: PortalSession }) {
       {error ? <Alert status="error" mb="5" borderRadius="lg"><AlertIcon />{error}</Alert> : null}
       {router.query.checkout === "success" ? <Alert status="info" mb="5" borderRadius="lg"><AlertIcon />Checkout completed. Payment is confirmed from Stripe; refresh payments if your status is still pending.</Alert> : null}
       {router.query.checkout === "canceled" ? <Alert status="info" mb="5" borderRadius="lg"><AlertIcon />Checkout was canceled. You can resume it below.</Alert> : null}
-      {billing && !billing.stripe.enabled ? <Alert status="info" mb="5" borderRadius="lg"><AlertIcon />Payments are not enabled for this account yet. Contact support to set up billing.</Alert> : null}
-      {billing?.stripe.enabled && billing.subscriptions.some((sub) => !["active", "orange", "red"].includes(sub.status)) ? <Alert status="warning" mb="5" borderRadius="lg"><AlertIcon />Machines without paid access have restricted configuration, product deployments, promotions, and free mode. Billing, support, sales history, and service controls remain available.</Alert> : null}
+      {billing && !billing.stripe.enabled ? <Alert status="info" mb="5" borderRadius="lg"><AlertIcon />Your subscription access is managed by your administrator.</Alert> : null}
+      {billing?.restrictions_enabled !== false && billing?.stripe.enabled && billing.subscriptions.some((sub) => !["active", "orange", "red"].includes(sub.status)) ? <Alert status="warning" mb="5" borderRadius="lg"><AlertIcon />Machines without paid access have restricted configuration, product deployments, promotions, and free mode. Billing, support, sales history, and service controls remain available.</Alert> : null}
       {!billing && !error ? <Text py="8">Loading billing…</Text> : null}
       {billing ? <>
         <SimpleGrid columns={{ base: 1, md: 3 }} spacing="4" mb="8">
@@ -100,8 +100,9 @@ export default function BillingPage({ session }: { session: PortalSession }) {
             <Text color="whiteAlpha.700" fontSize="sm">Machine #{sub.machine_id} · {sub.machine_type || "Machine"}</Text>
             <Text fontSize="2xl" fontWeight="bold" my="3">{sub.monthly_price_cents === null ? "Price pending" : `${money(sub.monthly_price_cents)} / 30 days`}</Text>
             <Box my="3" p="3" borderRadius="lg" bg={sub.ends_at ? "green.900" : "whiteAlpha.100"}>
-              <Text fontSize="xs" color="whiteAlpha.700">Paid until</Text>
+              <Text fontSize="xs" color="whiteAlpha.700">{sub.access_source === "admin" ? "Access until" : "Paid until"}</Text>
               <Text fontWeight="bold">{sub.ends_at ? paidUntil(sub.ends_at) : "Not paid yet"}</Text>
+              {sub.access_source === "admin" ? <Text fontSize="xs" color="whiteAlpha.700">Set by your administrator. Stripe payment status is unchanged.</Text> : null}
               {sub.remaining_days !== null ? <Text fontSize="sm" color="whiteAlpha.700">{sub.remaining_days} days remaining</Text> : null}
             </Box>
             {sub.payment_status ? <Text fontSize="sm" mt="1">Payment: {label(sub.payment_status)}{sub.stripe_status ? ` · Subscription: ${label(sub.stripe_status)}` : ""}</Text> : null}

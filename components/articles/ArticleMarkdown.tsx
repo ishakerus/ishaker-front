@@ -196,7 +196,7 @@ const components: Record<string, MarkdownComponent> = {
       <Table
         variant="simple"
         minW={isTwoColumn ? "0" : "560px"}
-        tableLayout={isTwoColumn ? "fixed" : "auto"}
+        style={{ tableLayout: isTwoColumn ? "fixed" : "auto" }}
         sx={isTwoColumn ? {
           "& th, & td": {
             px: { base: "3", md: "6" },

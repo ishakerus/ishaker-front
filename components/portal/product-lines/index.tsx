@@ -270,7 +270,7 @@ export function ProductLinesPage({
     <PortalShell
       title="Product lines"
       description="Manage your drink and flavour library, then assign products to physical machine containers."
-      clientName={session.client.company}
+      clientName={session.client.company} billingEnabled={session.client.subscription_billing_enabled}
       access={session.access}
       showSupportBanner={false}
       headerAction={

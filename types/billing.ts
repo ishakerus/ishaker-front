@@ -21,6 +21,8 @@ export type BillingSubscription = {
   subscription_id: number | null;
   starts_at: string | null;
   ends_at: string | null;
+  paid_until?: string | null;
+  access_source?: "admin" | "manual" | "stripe" | null;
   remaining_days: number | null;
   payment_url: string | null;
   monthly_price_cents: number | null;
@@ -32,6 +34,7 @@ export type BillingSubscription = {
 };
 
 export type ClientBilling = {
+  restrictions_enabled?: boolean;
   client_id: number;
   currency: string;
   as_of: string;

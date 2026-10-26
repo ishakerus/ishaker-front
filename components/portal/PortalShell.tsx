@@ -49,6 +49,7 @@ type PortalShellProps = PropsWithChildren<{
   access?: "client" | "product";
   headerAction?: ReactNode;
   showSupportBanner?: boolean;
+  billingEnabled?: boolean;
 }>;
 
 const navItems = [
@@ -69,13 +70,14 @@ export function PortalShell({
   access = "client",
   headerAction,
   showSupportBanner = true,
+  billingEnabled = false,
   children,
 }: PortalShellProps) {
   const router = useRouter();
   const mobileNav = useDisclosure();
   const touchStartX = useRef<number | null>(null);
   const [billingWarning, setBillingWarning] = useState<"orange" | "red" | null>(null);
-  const showBilling = access === "client" && clientName?.trim().toLowerCase() === "bob";
+  const showBilling = access === "client" && billingEnabled;
   const visibleNavItems =
     access === "product"
       ? navItems.filter((item) => item.href === "/product-lines")

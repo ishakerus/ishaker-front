@@ -118,7 +118,7 @@ function MachinesPage({ session }: MachinesPageProps) {
     <PortalShell
       title="Machines"
       description="All machines registered to your account. Assign library products to their physical containers."
-      clientName={session.client.company}
+      clientName={session.client.company} billingEnabled={session.client.subscription_billing_enabled}
     >
       <SimpleGrid columns={{ base: 1, lg: 2 }} spacing="4">
         {machines.map((machine) => {

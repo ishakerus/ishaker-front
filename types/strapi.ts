@@ -208,6 +208,8 @@ export type Client = {
   portal_email?: string | null;
   portal_access_enabled?: boolean;
   subscription_billing_enabled?: boolean;
+  subscription_access_until?: string | null;
+  subscription_restrictions_enabled?: boolean;
   portal_auth_provider?: "local" | "google" | "apple" | "facebook";
   country?: string;
   state?: string;

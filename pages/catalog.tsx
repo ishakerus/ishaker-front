@@ -235,7 +235,7 @@ export default function CatalogPage({
     <PortalShell
       title="Taste and brand catalog"
       description="Create and manage your tastes and brands, or browse shared catalog items."
-      clientName={session.client.company}
+      clientName={session.client.company} billingEnabled={session.client.subscription_billing_enabled}
     >
       {loadErrors.length ? (
         <Alert status="warning" borderRadius="xl" my="4">

@@ -109,7 +109,7 @@ function MachineDetailPage({
     <PortalShell
       title={machine.title || "Machine detail"}
       description="Machine access and status are sourced from the signed-in client's Strapi records."
-      clientName={session.client.company}
+      clientName={session.client.company} billingEnabled={session.client.subscription_billing_enabled}
     >
       <SimpleGrid columns={{ base: 1, xl: 2 }} spacing="6">
         <Stack

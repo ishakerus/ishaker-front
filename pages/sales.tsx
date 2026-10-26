@@ -133,7 +133,7 @@ export default function SalesPage({ session }: SalesPageProps) {
     <PortalShell
       title="Sales"
       description="Drinks actually dispensed by the machine. Card fees, refunds, and settlement are not included here; those are available only in Nayax."
-      clientName={session.client.company}
+      clientName={session.client.company} billingEnabled={session.client.subscription_billing_enabled}
     >
       <Box bg="bg.900" border="1px solid" borderColor="whiteAlpha.100" borderRadius="2xl" p="5" mb="6">
         <HStack align="end" spacing="4" flexWrap="wrap">
