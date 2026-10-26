@@ -27,8 +27,7 @@ export function parseSubscriptionPlan(body: unknown) {
   if (data.accessUntil !== null && (typeof data.accessUntil !== "string" ||
       !/^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}\.\d{3}Z$/.test(data.accessUntil) ||
       !Number.isFinite(Date.parse(data.accessUntil)) || new Date(data.accessUntil).toISOString() !== data.accessUntil)) return null;
-  return { subscription_restrictions_enabled: data.restrictionsEnabled, subscription_access_until: data.accessUntil as string | null,
-    ...(data.restrictionsEnabled || data.accessUntil ? { subscription_billing_enabled: true } : {}) };
+  return { subscription_billing_enabled: true, subscription_restrictions_enabled: data.restrictionsEnabled, subscription_access_until: data.accessUntil as string | null };
 }
 
 export function subscriptionPlanStatus(client: Pick<AdminSubscriptionClient, "subscription_billing_enabled" | "subscription_restrictions_enabled" | "subscription_access_until">, now = Date.now()) {
