@@ -186,7 +186,32 @@ const components: Record<string, MarkdownComponent> = {
     ) : (
       <Code display="block" bg="transparent" color="acid.100" whiteSpace="pre" {...props}>{children}</Code>
     ),
-  table: ({ children }) => <Table variant="simple">{children}</Table>,
+  table: ({ children, node }) => {
+    const header = node?.children?.find((child: any) => child.tagName === "thead");
+    const headerRow = header?.children?.find((child: any) => child.tagName === "tr");
+    const columnCount = headerRow?.children?.filter((child: any) => child.tagName === "th").length;
+    const isTwoColumn = columnCount === 2;
+
+    return (
+      <Table
+        variant="simple"
+        minW={isTwoColumn ? "0" : "560px"}
+        tableLayout={isTwoColumn ? "fixed" : "auto"}
+        sx={isTwoColumn ? {
+          "& th, & td": {
+            px: { base: "3", md: "6" },
+            verticalAlign: "top",
+            overflowWrap: "break-word",
+          },
+          "& th:first-of-type, & td:first-of-type": {
+            width: { base: "35%", md: "28%" },
+          },
+        } : undefined}
+      >
+        {children}
+      </Table>
+    );
+  },
   thead: ({ children }) => <Thead>{children}</Thead>,
   tbody: ({ children }) => <Tbody>{children}</Tbody>,
   tr: ({ children }) => <Tr>{children}</Tr>,
@@ -205,7 +230,6 @@ export function ArticleMarkdown({ markdown }: { markdown: string }) {
         "& > :last-child": { mb: 0 },
         "& .contains-task-list": { listStyleType: "none", pl: 0 },
         "& .task-list-item input": { mr: 3, accentColor: "#76f85f" },
-        "& table": { minW: "560px" },
       }}
     >
       <TableContainer whiteSpace="normal" overflowX="auto">
