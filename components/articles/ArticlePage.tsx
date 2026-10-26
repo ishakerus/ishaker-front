@@ -111,8 +111,7 @@ export function ArticlePage({ article }: { article: Article }) {
 
           <Box
             as="article"
-            maxW="900px"
-            mx="auto"
+            w="full"
             bg={panelBg}
             border="1px solid"
             borderColor={borderColor}
