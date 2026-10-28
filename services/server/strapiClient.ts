@@ -1,8 +1,6 @@
 import { fetchJsonWithTimeout } from "../../lib/http/fetchJsonWithTimeout";
 import { supportContext } from "../../lib/admin/context";
 import { canSupportWriteStrapi } from "../../lib/admin/permissions";
-import fs from "fs";
-import path from "path";
 import { getStrapiBaseUrl } from "../fetchers";
 import normalize from "../normalizer";
 
@@ -17,33 +15,6 @@ type CachedToken = {
 let cachedToken: CachedToken | null = null;
 let loginPromise: Promise<string> | null = null;
 
-const readLocalStrapiEnv = () => {
-  if (process.env.NODE_ENV === "production") return {};
-  const hostname = new URL(getStrapiBaseUrl()).hostname;
-  if (!["localhost", "127.0.0.1", "[::1]"].includes(hostname)) return {};
-
-  try {
-    const envPath = path.resolve(process.cwd(), "../strapi/.env");
-    const contents = fs.readFileSync(envPath, "utf8");
-    return contents.split(/\r?\n/).reduce<Record<string, string>>((acc, line) => {
-      const trimmed = line.trim();
-      if (!trimmed || trimmed.startsWith("#")) return acc;
-
-      const separatorIndex = trimmed.indexOf("=");
-      if (separatorIndex === -1) return acc;
-
-      const key = trimmed.slice(0, separatorIndex).trim();
-      const value = trimmed.slice(separatorIndex + 1).trim();
-      if (key) acc[key] = value;
-      return acc;
-    }, {});
-  } catch {
-    return {};
-  }
-};
-
-const localStrapiEnv = readLocalStrapiEnv();
-
 const getServiceCredentialCandidates = () => {
   const candidates = [
     {
@@ -53,14 +24,6 @@ const getServiceCredentialCandidates = () => {
     {
       identifier: process.env.STRAPI_AUTH_IDENTIFIER,
       password: process.env.STRAPI_AUTH_PASSWORD,
-    },
-    {
-      identifier: localStrapiEnv.STRAPI_MACHINE_USER_LOGIN,
-      password: localStrapiEnv.STRAPI_MACHINE_USER_PASSWORD,
-    },
-    {
-      identifier: localStrapiEnv.STRAPI_AUTH_IDENTIFIER,
-      password: localStrapiEnv.STRAPI_AUTH_PASSWORD,
     },
   ].filter(
     (
@@ -240,11 +203,12 @@ export const requestStrapiRestAsService = async <T = any>(
 ) => {
   const support = supportContext.getStore();
   const method = (init?.method || "GET").toUpperCase();
-  if (support && !["GET", "HEAD"].includes(method)) {
-    if (!canSupportWriteStrapi(path, method)) {
+  if (support) {
+    if (!["GET", "HEAD"].includes(method) && !canSupportWriteStrapi(path, method)) {
       throw Object.assign(new Error("This action is outside support permissions."), { status: 403 });
     }
-    // Never retry a support write with the more privileged service account.
+    // Use the signed-in operator's permissions for reads and writes. Never
+    // substitute device/service credentials or retry with a different identity.
     return requestStrapiRest<T>(path, init, support.jwt, true);
   }
   let jwt = await getStrapiJwt(false);
@@ -260,18 +224,19 @@ export const requestStrapiRestAsService = async <T = any>(
   }
 };
 
-/** Keep Strapi's `meta.pagination` while still using the service account. */
+/** Keep Strapi's `meta.pagination` and the current request's identity. */
 export const requestStrapiRestPayloadAsService = async <T = any>(
   path: string,
   init?: RequestInit,
 ) => {
   const support = supportContext.getStore();
   const method = (init?.method || "GET").toUpperCase();
-  if (support && !["GET", "HEAD"].includes(method)) {
-    if (!canSupportWriteStrapi(path, method)) {
+  if (support) {
+    if (!["GET", "HEAD"].includes(method) && !canSupportWriteStrapi(path, method)) {
       throw Object.assign(new Error("This action is outside support permissions."), { status: 403 });
     }
-    // Never retry a support write with the more privileged service account.
+    // Use the signed-in operator's permissions for reads and writes. Never
+    // substitute device/service credentials or retry with a different identity.
     return requestStrapiRest<T>(path, init, support.jwt, false);
   }
   let jwt = await getStrapiJwt(false);
@@ -309,8 +274,7 @@ export const fetchStrapiCatalogEndpoint = async (
   if (supportContext.getStore() && !["GET", "HEAD"].includes((init?.method || "GET").toUpperCase())) {
     throw Object.assign(new Error("Support cannot use device credentials to write."), { status: 403 });
   }
-  const catalogToken =
-    process.env.CATALOG_TOKEN || localStrapiEnv.CATALOG_TOKEN;
+  const catalogToken = process.env.CATALOG_TOKEN;
   return fetch(`${getStrapiBaseUrl()}${path}`, {
     ...init,
     headers: {
@@ -323,4 +287,4 @@ export const fetchStrapiCatalogEndpoint = async (
 };
 
 export const hasStrapiCatalogToken = () =>
-  Boolean(process.env.CATALOG_TOKEN || localStrapiEnv.CATALOG_TOKEN);
+  Boolean(process.env.CATALOG_TOKEN);

@@ -1,11 +1,11 @@
 import { Box, Container, SimpleGrid, VStack } from "@chakra-ui/react";
 import { useEffect, useMemo, useRef, useState } from "react";
+import { getStrapiBaseUrl } from "../../services/fetchers";
 import { Courosel, type TasteSlide } from "./Courosel";
 import CustomTitle from "./CutsomTitle";
 import { SPLASH_FADE_MS, useSplashAnimation } from "./Splash";
 
-const STRAPI_URL =
-  process.env.NEXT_PUBLIC_STRAPI_URL || "https://admin.ishaker.xyz";
+const STRAPI_URL = getStrapiBaseUrl();
 const TASTE_SOURCE_QUERY = [
   "pagination[pageSize]=2000",
   "fields[0]=name",

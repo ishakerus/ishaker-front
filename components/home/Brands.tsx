@@ -9,10 +9,10 @@ import {
 } from "@chakra-ui/react";
 import { useEffect, useMemo, useRef, useState } from "react";
 import { FaChevronDown } from "react-icons/fa";
+import { getStrapiBaseUrl } from "../../services/fetchers";
 import CustomTitle from "./CutsomTitle";
 
-const STRAPI_URL =
-  process.env.NEXT_PUBLIC_STRAPI_URL || "https://admin.ishaker.xyz";
+const STRAPI_URL = getStrapiBaseUrl();
 const BRAND_SOURCE_URL = `${STRAPI_URL}/api/brands?pagination[page]=1&pagination[pageSize]=2000&sort[0]=updatedAt:desc&populate[logo][fields][0]=url&populate[logo][fields][1]=formats&fields[0]=name`;
 const VISIBLE_BRAND_LIMIT = 40;
 

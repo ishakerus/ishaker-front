@@ -3,7 +3,7 @@ import { withAdminApi } from "../../../../lib/admin/access";
 import { requireAdminApiSession } from "../../../../lib/admin/auth";
 import { requestStrapiRestWithJwt } from "../../../../services/server/strapiClient";
 import { supportContext } from "../../../../lib/admin/context";
-import type { AdminSubscriptionClient } from "../../../../lib/admin/subscriptions";
+import type { AdminSubscriptionClient, AdminSubscriptionMachine } from "../../../../lib/admin/subscriptions";
 
 async function handler(req: NextApiRequest, res: NextApiResponse) {
   if (!requireAdminApiSession(req, res)) return;
@@ -12,10 +12,13 @@ async function handler(req: NextApiRequest, res: NextApiResponse) {
     return res.status(405).json({ error: "method_not_allowed" });
   }
   const params = new URLSearchParams({
+    "filters[status][$eq]": "client",
     "fields[0]": "company", "fields[1]": "portal_email", "fields[2]": "subscription_billing_enabled", "fields[3]": "subscription_access_until",
     "fields[4]": "subscription_restrictions_enabled",
+    "fields[5]": "state", "fields[6]": "city", "fields[7]": "country", "fields[8]": "status",
     "populate[users_permissions_users][fields][0]": "username", "populate[users_permissions_users][fields][1]": "email",
     "populate[machines][fields][0]": "title", "populate[machines][fields][1]": "serial_number",
+    "populate[machines][fields][2]": "nickname",
     "populate[machines][populate][machine_type][fields][0]": "name",
     "populate[machines][populate][machine_type][fields][1]": "subscription_monthly_price_cents",
     "populate[machines][populate][subscription][fields][0]": "ends_at",
@@ -25,15 +28,24 @@ async function handler(req: NextApiRequest, res: NextApiResponse) {
     "populate[machines][populate][subscription][fields][4]": "stripe_status",
     "populate[machines][populate][subscription][fields][5]": "stripe_cancel_at_period_end",
     "populate[machines][populate][subscription][fields][6]": "stripe_current_period_end",
+    "populate[machines][populate][subscription][fields][7]": "starts_at",
+    "populate[machines][populate][subscription][fields][8]": "stripe_resume_at",
+    "populate[machines][populate][subscription][fields][9]": "stripe_resume_price_cents",
     "sort[0]": "company:asc", "pagination[pageSize]": "2000",
   });
   try {
     const jwt = supportContext.getStore()!.jwt;
-    const [clients, stripeConfig] = await Promise.all([
+    const unassignedParams = new URLSearchParams({
+      "filters[client][id][$null]": "true",
+      "fields[0]": "nickname", "fields[1]": "title", "fields[2]": "serial_number",
+      "sort[0]": "nickname:asc", "pagination[pageSize]": "2000",
+    });
+    const [clients, stripeConfig, unassignedMachines] = await Promise.all([
       requestStrapiRestWithJwt<AdminSubscriptionClient[]>(`/api/clients?${params}`, jwt),
       requestStrapiRestWithJwt<{ managed_client_id: string | null; mode: string; test_client_name: string }>("/api/subscription-admin/config", jwt),
+      requestStrapiRestWithJwt<AdminSubscriptionMachine[]>(`/api/machines?${unassignedParams}`, jwt),
     ]);
-    return res.status(200).json({ clients, stripeConfig });
+    return res.status(200).json({ clients, stripeConfig, unassignedMachines });
   } catch {
     return res.status(502).json({ error: "subscription_load_failed", message: "Subscription settings could not be loaded." });
   }

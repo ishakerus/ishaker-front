@@ -9,15 +9,18 @@ async function handler(req: NextApiRequest, res: NextApiResponse) {
   if (!requireAdminApiSession(req, res)) return;
   if (req.method !== "POST") { res.setHeader("Allow", ["POST"]); return res.status(405).json({ error: "method_not_allowed" }); }
   const id = typeof req.query.id === "string" && /^\d+$/.test(req.query.id) ? req.query.id : "";
-  const { action, machineId, priceCents } = req.body || {};
-  if (!id || !["start", "cancel", "resume", "update_price", "sync"].includes(action) ||
+  const { action, machineId, priceCents, startsAt } = req.body || {};
+  if (!id || !["start", "cancel", "resume", "sync"].includes(action) ||
       (action !== "sync" && (!Number.isSafeInteger(machineId) || machineId <= 0)) ||
-      (["start", "update_price"].includes(action) && (!Number.isSafeInteger(priceCents) || priceCents < 50))) {
+      (["start", "resume"].includes(action) && (!Number.isSafeInteger(priceCents) || priceCents < 50))) {
     return res.status(400).json({ error: "invalid_plan_action", message: "Choose a machine and a valid plan action and price." });
+  }
+  if (["start", "resume"].includes(action) && startsAt != null && (typeof startsAt !== "string" || !Number.isFinite(Date.parse(startsAt)) || new Date(startsAt).toISOString() !== startsAt || Date.parse(startsAt) <= Date.now())) {
+    return res.status(400).json({ error: "invalid_start_date", message: "Choose a future date or Now." });
   }
   try {
     const billing = await requestStrapiRestAsService(`/api/client-billing/${id}/admin-plan`, {
-      method: "POST", body: JSON.stringify({ action, machine_id: machineId, price_cents: priceCents }),
+      method: "POST", body: JSON.stringify({ action, machine_id: machineId, price_cents: priceCents, starts_at: startsAt }),
     });
     return res.status(200).json({ billing });
   } catch (error) {

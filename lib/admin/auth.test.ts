@@ -16,7 +16,7 @@ import {
 } from "./http";
 import { canSupportUseRoute, canSupportWriteStrapi } from "./permissions";
 import { supportContext } from "./context";
-import { requestStrapiRestAsService } from "../../services/server/strapiClient";
+import { requestStrapiRestAsService, requestStrapiRestPayloadAsService } from "../../services/server/strapiClient";
 import { withAdminApi, withSupportPortalApi } from "./access";
 import fs from "node:fs/promises";
 import path from "node:path";
@@ -310,4 +310,32 @@ test('every admin and portal API keeps its support authorization wrapper', async
       assert.match(contents, new RegExp(`export default ${wrapper}\\(handler\\)`), file);
     }
   }
+});
+
+
+test('support REST reads retain operator permissions and ticket pagination metadata', async (t) => {
+  const calls: string[] = [];
+  t.mock.method(globalThis, "fetch", async (_url: any, init: RequestInit) => {
+    calls.push((init.headers as Record<string, string>).Authorization);
+    return new Response(JSON.stringify({ data: [{ id: 1, attributes: { resolved: false } }], meta: { pagination: { total: 7 } } }));
+  });
+  await supportContext.run(session(), async () => {
+    assert.deepEqual(await requestStrapiRestAsService("/api/tickets"), [{ id: 1, resolved: false }]);
+    const payload = await requestStrapiRestPayloadAsService<any>("/api/tickets?pagination[pageSize]=1");
+    assert.equal(payload.meta.pagination.total, 7);
+  });
+  assert.deepEqual(calls, ["Bearer support-jwt", "Bearer support-jwt"]);
+});
+
+test('denied support reads never fall back to the device account', async (t) => {
+  const calls: string[] = [];
+  t.mock.method(globalThis, "fetch", async (_url: any, init: RequestInit) => {
+    calls.push((init.headers as Record<string, string>).Authorization);
+    return new Response(JSON.stringify({ error: { message: "Forbidden" } }), { status: 403 });
+  });
+  await supportContext.run(session(), async () => {
+    await assert.rejects(requestStrapiRestAsService("/api/tickets"), { status: 403 });
+    await assert.rejects(requestStrapiRestPayloadAsService("/api/tickets"), { status: 403 });
+  });
+  assert.deepEqual(calls, ["Bearer support-jwt", "Bearer support-jwt"]);
 });

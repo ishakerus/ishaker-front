@@ -1,6 +1,6 @@
 import normalize from "./normalizer";
 
-const DEFAULT_STRAPI_URL = "https://admin.ishaker.xyz";
+const PRODUCTION_STRAPI_URL = "https://admin.ishaker.xyz";
 
 const unwrap = (data: any) => {
   if (
@@ -14,12 +14,9 @@ const unwrap = (data: any) => {
   return data;
 };
 
-export const getStrapiBaseUrl = () =>
-  (
-    process.env.STRAPI_URL ||
-    process.env.NEXT_PUBLIC_STRAPI_URL ||
-    DEFAULT_STRAPI_URL
-  ).replace(/\/$/, "");
+// Local frontend development uses the live backend too. Environment overrides
+// must never redirect requests to a stale local or development Strapi database.
+export const getStrapiBaseUrl = () => PRODUCTION_STRAPI_URL;
 
 export const initCMSFetcher = () => {
   const url = `${getStrapiBaseUrl()}/graphql`;
