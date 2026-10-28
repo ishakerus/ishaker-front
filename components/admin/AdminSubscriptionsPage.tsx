@@ -166,7 +166,7 @@ export default function AdminSubscriptionsPage() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
   const [planBusy, setPlanBusy] = useState(false);
-  const [stripeConfig, setStripeConfig] = useState<{ managed_client_id: string | null; mode: string; test_client_name: string } | null>(null);
+  const [stripeConfig, setStripeConfig] = useState<{ mode: string } | null>(null);
   const selected = clients.find((client) => String(client.id) === selectedId);
 
 
@@ -209,7 +209,7 @@ export default function AdminSubscriptionsPage() {
     } catch (caught) { const message = caught instanceof Error ? caught.message : "The plan action failed."; setError(message); toast({ title: "Plan action failed", description: message, status: "error" }); return false; }
     finally { setPlanBusy(false); }
   };
-  const stripeEnabled = Boolean(selected && stripeConfig && (stripeConfig.mode === "live" ? String(selected.id) === stripeConfig.managed_client_id : selected.company.toLowerCase() === stripeConfig.test_client_name.toLowerCase()));
+  const stripeEnabled = Boolean(selected?.status === "client" && stripeConfig);
 
   return <AdminShell title={selected ? `${selected.company} · Subscriptions` : "Subscriptions"}>
     <Text color="bg.300" mb="6">Find a client or machine to open the client’s subscription page. Review expiring subscriptions below.</Text>
@@ -224,7 +224,7 @@ export default function AdminSubscriptionsPage() {
     {selectedId && loading ? <Skeleton height="280px" borderRadius="xl" /> : null}
     {selected?.machines?.length ? <Box mt="6" p="6" bg="bg.900" borderRadius="xl">
       <HStack justify="space-between" mb="4"><Heading size="md">Existing subscription plans</Heading><Button size="sm" isLoading={planBusy} isDisabled={!stripeEnabled} onClick={() => void managePlan("sync")}>Refresh from Stripe</Button></HStack>
-      {!stripeEnabled ? <Alert status="info" mb="4" borderRadius="lg"><AlertIcon />Stripe plan management is limited to the current pilot client.</Alert> : <Text color="bg.300" fontSize="sm" mb="4">Starting a plan creates an unpaid recurring invoice on its selected start date. Canceling stops renewal at the period end. Edited prices apply when you cancel and resume renewal, or start a new plan.</Text>}
+      <Text color="bg.300" fontSize="sm" mb="4">Starting a plan creates an unpaid recurring invoice on its selected start date. Canceling stops renewal at the period end. Edited prices apply when you cancel and resume renewal, or start a new plan.</Text>
       <TableContainer><Table><Thead><Tr><Th>Machine</Th><Th>Plan price</Th><Th>Existing plan</Th><Th>Recorded paid until</Th><Th>Billing period ends</Th><Th>Manage plan</Th></Tr></Thead><Tbody>
         {selected.machines.map((machine) => <MachinePlanRow key={machine.id} machine={machine} enabled={stripeEnabled} busy={planBusy} action={managePlan} />)}
       </Tbody></Table></TableContainer>

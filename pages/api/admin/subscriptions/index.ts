@@ -42,7 +42,7 @@ async function handler(req: NextApiRequest, res: NextApiResponse) {
     });
     const [clients, stripeConfig, unassignedMachines] = await Promise.all([
       requestStrapiRestWithJwt<AdminSubscriptionClient[]>(`/api/clients?${params}`, jwt),
-      requestStrapiRestWithJwt<{ managed_client_id: string | null; mode: string; test_client_name: string }>("/api/subscription-admin/config", jwt),
+      requestStrapiRestWithJwt<{ mode: string; enrollment?: string }>("/api/subscription-admin/config", jwt),
       requestStrapiRestWithJwt<AdminSubscriptionMachine[]>(`/api/machines?${unassignedParams}`, jwt),
     ]);
     return res.status(200).json({ clients, stripeConfig, unassignedMachines });
