@@ -34,6 +34,7 @@ export type BillingSubscription = {
 };
 
 export type ClientBilling = {
+  account_charges?: AccountCharge[];
   restrictions_enabled?: boolean;
   client_id: number;
   currency: string;
@@ -51,4 +52,21 @@ export type ClientBilling = {
     last_synced_at: string | null;
     invoices: BillingInvoice[];
   };
+};
+
+export type AccountCharge = {
+  id: number;
+  description: string;
+  amount_cents: number;
+  currency: string;
+  frequency: "once" | "monthly" | "yearly";
+  due_days: number;
+  status: string;
+  payment_status: string;
+  outstanding_cents: number;
+  renewal_canceled: boolean;
+  next_invoice_at: string | null;
+  created_at: string | null;
+  last_synced_at: string | null;
+  invoices: BillingInvoice[];
 };

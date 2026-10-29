@@ -1,3 +1,4 @@
+import { AdminAccountInvoices } from "../billing/AccountInvoices";
 import {
   Alert, AlertIcon, Box, Button, FormControl, FormHelperText, FormLabel,
   Heading, HStack, Input, LinkBox, LinkOverlay, Skeleton, SimpleGrid, Table, TableContainer,
@@ -229,6 +230,7 @@ export default function AdminSubscriptionsPage() {
         {selected.machines.map((machine) => <MachinePlanRow key={machine.id} machine={machine} enabled={stripeEnabled} busy={planBusy} action={managePlan} />)}
       </Tbody></Table></TableContainer>
     </Box> : null}
+    {selected ? <AdminAccountInvoices key={String(selected.id)} clientId={selected.id} clientName={selected.company} /> : null}
     {selected && !selected.machines?.length ? <Text color="bg.300">No machines assigned to this client.</Text> : null}
   </AdminShell>;
 }
