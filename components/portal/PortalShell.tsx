@@ -79,7 +79,8 @@ export function PortalShell({
   const mobileNav = useDisclosure();
   const touchStartX = useRef<number | null>(null);
   const [billingWarning, setBillingWarning] = useState<"orange" | "red" | null>(null);
-  const showBilling = access === "client" && billingEnabled;
+  const showBilling = access === "client";
+  const [accountInvoiceCount, setAccountInvoiceCount] = useState(0);
   const visibleNavItems =
     access === "product"
       ? navItems.filter((item) => item.href === "/product-lines")
@@ -95,6 +96,7 @@ export function PortalShell({
         if (!response.ok) return;
         const data = await response.json();
         const colors = (data.subscriptions || []).map((sub: { notification_color?: string }) => sub.notification_color);
+        if (alive) setAccountInvoiceCount((data.account_charges || []).filter((charge: { outstanding_cents: number }) => charge.outstanding_cents > 0).length);
         if (alive) setBillingWarning(colors.includes("red") ? "red" : colors.includes("orange") ? "orange" : null);
       } catch { /* Billing warnings must not prevent portal access. */ }
     };
@@ -433,6 +435,7 @@ export function PortalShell({
             </Flex>
             <Box order="2">
               {billingWarning && router.pathname !== "/billing" ? <Alert status={billingWarning === "red" ? "error" : "warning"} mb="5" borderRadius="lg"><AlertIcon /><Text>Your machine subscription needs attention. <Link href="/billing">View billing and payment options</Link>.</Text></Alert> : null}
+              {accountInvoiceCount > 0 && router.pathname !== "/billing" ? <Alert status="warning" mb="5" borderRadius="lg"><AlertIcon /><Text>{accountInvoiceCount} unpaid account {accountInvoiceCount === 1 ? "invoice" : "invoices"}. <Link href="/billing#account-invoices">View and pay</Link>. Your access is unaffected.</Text></Alert> : null}
               {children}
             </Box>
           </Container>

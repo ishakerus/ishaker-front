@@ -17,7 +17,7 @@ const deletableCollections = new Set([
 export const canSupportWriteStrapi = (path: string, method: string) => {
   const pathname = path.split("?")[0];
   if (pathname === "/api/upload") return method === "POST";
-  if (/^\/api\/client-billing\/\d+\/(checkout|portal|sync|admin-plan)$/.test(pathname)) return method === "POST";
+  if (/^\/api\/client-billing\/\d+\/(checkout|portal|sync|admin-plan|account-invoices)$/.test(pathname)) return method === "POST";
   if (/^\/api\/machines\/\d+\/free-mode$/.test(pathname)) return method === "PUT";
   if (/^\/api\/machines\/\d+\/apply-preset$/.test(pathname)) return method === "POST";
   const match = pathname.match(/^\/api\/([a-z-]+)(?:\/(\d+))?$/);
@@ -35,7 +35,7 @@ export const canSupportUseRoute = (path: string, method: string, scope: "admin" 
     if (/^\/api\/admin\/machines\/\d+\/cabinet$/.test(path)) return method === "POST";
     if (path === "/api/admin/cabinet/exit") return method === "POST";
     if (/^\/api\/admin\/subscriptions\/\d+$/.test(path)) return method === "PUT";
-    if (/^\/api\/admin\/subscriptions\/\d+\/plan$/.test(path)) return method === "POST";
+    if (/^\/api\/admin\/subscriptions\/\d+\/(plan|invoices)$/.test(path)) return method === "POST";
     return /^\/api\/admin\/(machines|currencies|presets|languages|translations|translation-sets|voice-clips|products|product-lines|tutorials|tickets)(?:\/\d+)?(?:\/(free-mode|apply|entries))?$/.test(path);
   }
   // A valid support cabinet is bound to one portal user/client. The portal

@@ -154,3 +154,8 @@ test("a scheduled renewal stays enrolled after its previous Stripe plan ends", (
   assert.equal(filterSubscriptionMachines(rows, "not_activated").length, 0);
   assert.equal(filterSubscriptionMachines(rows, "connected").length, 1);
 });
+
+test("support can issue and cancel account invoices through the scoped billing action", () => {
+  assert.equal(canSupportUseRoute("/api/admin/subscriptions/47/invoices", "POST", "admin"), true);
+  assert.equal(canSupportUseRoute("/api/admin/subscriptions/47/invoices", "DELETE", "admin"), false);
+});

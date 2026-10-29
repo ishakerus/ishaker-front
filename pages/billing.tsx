@@ -7,6 +7,7 @@ import { useRouter } from "next/router";
 import { useCallback, useEffect, useRef, useState } from "react";
 import { PortalShell } from "../components/portal/PortalShell";
 import { requirePortalSession } from "../lib/portal/auth";
+import { AccountInvoices } from "../components/billing/AccountInvoices";
 import type { ClientBilling } from "../types/billing";
 import type { PortalSession } from "../types/portal";
 
@@ -58,18 +59,21 @@ export default function BillingPage({ session }: { session: PortalSession }) {
     let alive = true;
     setBusy("load");
     load().then(async (result) => {
-      if (alive && result.stripe.enabled && result.stripe.linked) await action("sync");
+      if (alive && result.stripe.linked) await action("sync");
     }).catch((caught) => { if (alive) setError(caught.message); }).finally(() => { if (alive) setBusy(""); });
     return () => { alive = false; };
   }, [router.isReady, load, action]);
 
   useEffect(() => {
-    if (!billing?.stripe.enabled || !billing.stripe.linked) return;
+    if (!billing?.stripe.linked) return;
     const refresh = () => { if (document.visibilityState === "visible") void action("sync", undefined, true); };
     const timer = window.setInterval(refresh, 15000);
     window.addEventListener("focus", refresh);
     return () => { window.clearInterval(timer); window.removeEventListener("focus", refresh); };
-  }, [billing?.stripe.enabled, billing?.stripe.linked, action]);
+  }, [billing?.stripe.linked, action]);
+
+  const accountInvoiceIds = new Set((billing?.account_charges || []).flatMap((charge) => charge.invoices.map((invoice) => invoice.id)));
+  const machineInvoices = (billing?.stripe.invoices || []).filter((invoice) => !accountInvoiceIds.has(invoice.id));
 
   return (
     <PortalShell title="Billing" description="Subscriptions and payments" clientName={session.client.company} billingEnabled={session.client.subscription_billing_enabled} access={session.access}>
@@ -77,8 +81,8 @@ export default function BillingPage({ session }: { session: PortalSession }) {
         <Box><Heading size="lg">Subscriptions & payments</Heading><Text mt="2" color="whiteAlpha.700">Service for your machines, billed every 30 days.</Text></Box>
         <HStack>
           <Badge colorScheme={billing?.stripe.test_mode === false ? "green" : "purple"}>{billing ? (!billing.stripe.enabled ? "Administrator-managed access" : billing.stripe.test_mode ? "Stripe test mode" : "Live billing") : "Billing"}</Badge>
-          <Button size="sm" isDisabled={!billing?.stripe.enabled || !billing.stripe.linked || Boolean(busy)} isLoading={busy === "sync"} onClick={() => void action("sync")}>Refresh payments</Button>
-          <Button size="sm" isDisabled={!billing?.stripe.enabled || !billing.stripe.linked || Boolean(busy)} isLoading={busy === "portal"} onClick={() => void action("portal")}>Manage billing</Button>
+          <Button size="sm" isDisabled={!billing?.stripe.linked || Boolean(busy)} isLoading={busy === "sync"} onClick={() => void action("sync")}>Refresh payments</Button>
+          <Button size="sm" isDisabled={!billing?.stripe.linked || Boolean(busy)} isLoading={busy === "portal"} onClick={() => void action("portal")}>Manage billing</Button>
         </HStack>
       </HStack>
       {error ? <Alert status="error" mb="5" borderRadius="lg"><AlertIcon />{error}</Alert> : null}
@@ -93,6 +97,7 @@ export default function BillingPage({ session }: { session: PortalSession }) {
           <Stat p="5" bg="whiteAlpha.50" borderRadius="xl"><StatLabel>Outstanding Stripe invoices (USD)</StatLabel><StatNumber>{money(billing.stripe.open_balance_cents)}</StatNumber></Stat>
           <Stat p="5" bg="whiteAlpha.50" borderRadius="xl"><StatLabel>{billing.balance_cents < 0 ? "Other account debt" : "Account credit"}</StatLabel><StatNumber>{money(Math.abs(billing.balance_cents))}</StatNumber><Text fontSize="xs" color="whiteAlpha.600">Staff-managed balance, separate from Stripe invoices.</Text></Stat>
         </SimpleGrid>
+        <AccountInvoices charges={billing.account_charges || []} />
         <Heading size="md" mb="4">Machine subscriptions</Heading>
         <SimpleGrid columns={{ base: 1, lg: 2 }} spacing="4" mb="8">
           {billing.subscriptions.map((sub) => <Box key={sub.machine_id} p="5" bg="whiteAlpha.50" borderRadius="xl" border="1px solid" borderColor={sub.notification_color ? `${sub.notification_color}.400` : "whiteAlpha.200"}>
@@ -112,9 +117,9 @@ export default function BillingPage({ session }: { session: PortalSession }) {
           </Box>)}
           {!billing.subscriptions.length ? <Text>No machines are assigned to your account.</Text> : null}
         </SimpleGrid>
-        <Heading size="md" mb="4">Invoices</Heading>
-        {!billing.stripe.invoices.length ? <Text color="whiteAlpha.700">No Stripe invoices yet. Start a subscription above.</Text> : <TableContainer border="1px solid" borderColor="whiteAlpha.200" borderRadius="xl"><Table><Thead><Tr><Th>Invoice</Th><Th>Created</Th><Th>Total</Th><Th>Status</Th><Th>Due</Th><Th>Payment</Th></Tr></Thead><Tbody>
-          {billing.stripe.invoices.map((invoice) => <Tr key={invoice.id}><Td>{invoice.number || invoice.id}</Td><Td>{date(invoice.created_at)}</Td><Td>{money(invoice.total_cents, invoice.currency)}</Td><Td><Badge colorScheme={color(invoice.payment_status)}>{label(invoice.payment_status)}</Badge></Td><Td>{date(invoice.due_at)}</Td><Td>{invoice.payment_url ? <Button as="a" href={invoice.payment_url} size="sm" target="_blank" rel="noopener noreferrer">{invoice.status === "open" ? "Pay invoice" : "View invoice"}</Button> : "—"}</Td></Tr>)}
+        <Heading size="md" mb="4">Machine invoices</Heading>
+        {!machineInvoices.length ? <Text color="whiteAlpha.700">No Stripe invoices yet. Start a subscription above.</Text> : <TableContainer border="1px solid" borderColor="whiteAlpha.200" borderRadius="xl"><Table><Thead><Tr><Th>Invoice</Th><Th>Created</Th><Th>Total</Th><Th>Status</Th><Th>Due</Th><Th>Payment</Th></Tr></Thead><Tbody>
+          {machineInvoices.map((invoice) => <Tr key={invoice.id}><Td>{invoice.number || invoice.id}</Td><Td>{date(invoice.created_at)}</Td><Td>{money(invoice.total_cents, invoice.currency)}</Td><Td><Badge colorScheme={color(invoice.payment_status)}>{label(invoice.payment_status)}</Badge></Td><Td>{date(invoice.due_at)}</Td><Td>{invoice.payment_url ? <Button as="a" href={invoice.payment_url} size="sm" target="_blank" rel="noopener noreferrer">{invoice.status === "open" ? "Pay invoice" : "View invoice"}</Button> : "—"}</Td></Tr>)}
         </Tbody></Table></TableContainer>}
         <Text mt="5" fontSize="xs" color="whiteAlpha.600">Last Stripe sync: {billing.stripe.last_synced_at ? new Date(billing.stripe.last_synced_at).toLocaleString() : "Not synced yet"}</Text>
         <Text mt="1" fontSize="xs" color="whiteAlpha.600">Payments refresh every 15 seconds while this page is open.</Text>
@@ -126,6 +131,6 @@ export default function BillingPage({ session }: { session: PortalSession }) {
 export const getServerSideProps: GetServerSideProps<{ session: PortalSession }> = async (context) => {
   const result = await requirePortalSession(context);
   if ("redirect" in result) return { redirect: result.redirect };
-  if (!result.session.client.subscription_billing_enabled) return { redirect: { destination: "/machines", permanent: false } };
+  if (result.session.access !== "client") return { redirect: { destination: "/machines", permanent: false } };
   return { props: { session: result.session } };
 };

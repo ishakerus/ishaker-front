@@ -13,7 +13,6 @@ async function handler(req: NextApiRequest, res: NextApiResponse) {
   if (!isSameOriginRequest(req)) return res.status(403).json({ error: "invalid_origin" });
   const session = await getPortalSessionFromApiRequest(req);
   if (!session || session.access !== "client" || !session.client.id) return res.status(401).json({ error: "unauthorized" });
-  if (!session.client.subscription_billing_enabled) return res.status(403).json({ error: "billing_not_enabled" });
   const base = `/api/client-billing/${session.client.id}`;
   try {
     if (req.method === "GET") return res.status(200).json(await requestStrapiRestAsService(base));
