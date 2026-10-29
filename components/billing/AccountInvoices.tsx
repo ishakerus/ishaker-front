@@ -18,7 +18,7 @@ function paymentUrl(value: string | null) {
   try { const url = new URL(value || ""); return url.protocol === "https:" && url.hostname === "invoice.stripe.com" ? url.href : null; } catch { return null; }
 }
 
-type Action = (action: "cancel" | "retry", charge: AccountCharge) => Promise<void>;
+type Action = (action: "cancel" | "delete" | "retry", charge: AccountCharge) => Promise<void>;
 function InvoiceCard({ charge, adminAction, busy }: { charge: AccountCharge; adminAction?: Action; busy?: boolean }) {
   const [history, setHistory] = useState(false);
   const [copied, setCopied] = useState(false);
@@ -50,8 +50,9 @@ function InvoiceCard({ charge, adminAction, busy }: { charge: AccountCharge; adm
         <Button size="sm" variant="ghost" onClick={() => setHistory(!history)} aria-expanded={history}>{history ? "Hide invoices" : `Invoices (${charge.invoices.length})`}</Button>
         {charge.status === "creating" && adminAction ? <Button size="sm" variant="outline" isDisabled={busy} onClick={() => void adminAction("retry", charge)}>Retry issuing</Button> : null}
         {cancelable && adminAction ? <Button size="sm" colorScheme="red" variant="ghost" ml={{ md: "auto" }} isDisabled={busy} onClick={() => void adminAction("cancel", charge)}>{recurring ? "Stop future invoices" : "Cancel invoice"}</Button> : null}
+        {adminAction ? <Button size="sm" colorScheme="red" variant="ghost" isDisabled={busy} onClick={() => void adminAction("delete", charge)}>Delete</Button> : null}
       </Flex>
-      {charge.status === "creating" ? <Text mt="3" fontSize="xs" color="orange.200">Issuing has not completed. Refresh to check Stripe before retrying.</Text> : null}
+      {charge.status === "creating" ? <Text mt="3" fontSize="xs" color="orange.200">Issuing has not completed. The payment status updates automatically. You can retry issuing if it remains incomplete.</Text> : null}
     </Box>
     <Collapse in={history}><Divider borderColor="whiteAlpha.100" /><Box p="4" bg="blackAlpha.200">
       {!charge.invoices.length ? <Text color="whiteAlpha.600" fontSize="sm">No issued invoices yet.</Text> : charge.invoices.map((invoice) => <Flex key={invoice.id} py="3" gap="3" align="center" wrap="wrap" borderBottom="1px solid" borderColor="whiteAlpha.100">
@@ -98,6 +99,14 @@ export function AdminAccountInvoices({ clientId, clientName }: { clientId: strin
     setCharges(data.charges || []);
   };
   useEffect(() => { const controller = new AbortController(); setLoading(true); setError(""); setOpen(false); setCharges([]); void load(controller.signal).catch((caught) => { if (!controller.signal.aborted) setError(caught.message); }).finally(() => { if (!controller.signal.aborted) setLoading(false); }); return () => controller.abort(); }, [endpoint]); // eslint-disable-line react-hooks/exhaustive-deps
+  useEffect(() => {
+    if (busy || open) return;
+    const controller = new AbortController();
+    const refresh = () => { if (document.visibilityState === "visible") void load(controller.signal).catch(() => {}); };
+    const timer = window.setInterval(refresh, 15000);
+    window.addEventListener("focus", refresh);
+    return () => { controller.abort(); window.clearInterval(timer); window.removeEventListener("focus", refresh); };
+  }, [endpoint, busy, open]); // eslint-disable-line react-hooks/exhaustive-deps
   const send = async (body: object) => {
     const response = await fetch(endpoint, { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify(body) }); const data = await response.json();
     if (!response.ok) throw new Error(data.message || "The invoice action failed.");
@@ -108,11 +117,12 @@ export function AdminAccountInvoices({ clientId, clientName }: { clientId: strin
   const run = async (task: () => Promise<void>, message: string) => { if (busy) return; setBusy(true); setError(""); try { await task(); toast({ title: message, status: "success" }); } catch (caught) { setError(caught instanceof Error ? caught.message : "Invoice action failed."); await load().catch(() => {}); } finally { setBusy(false); } };
   const create = () => run(async () => { await send({ action: "create", amount_cents: cents, description: description.trim(), frequency, due_days: Number(dueDays), request_key: requestKey }); setOpen(false); }, "Invoice issued");
   const action: Action = async (kind, charge) => {
+    if (kind === "delete" && !await showConfirm({ title: "Delete this invoice?", message: charge.frequency === "once" ? "This removes the invoice from the admin and client views and voids it if unpaid. Paid records stay in Stripe; no refund is issued." : "This removes the recurring invoice from both views, stops future billing immediately, and voids existing unpaid invoices. Paid records stay in Stripe; no refund is issued.", confirmLabel: "Delete invoice", tone: "danger" })) return;
     if (kind === "cancel" && !await showConfirm({ title: charge.frequency === "once" ? "Cancel this invoice?" : "Stop future invoices?", message: charge.frequency === "once" ? "The unpaid invoice will be voided and its payment link will stop accepting payment." : "No new invoices will be issued after the current period. Existing unpaid invoices remain payable. Machine access is unaffected.", confirmLabel: charge.frequency === "once" ? "Cancel invoice" : "Stop future invoices", tone: "danger" })) return;
-    await run(() => send({ action: kind, charge_id: charge.id }), kind === "retry" ? "Invoice issued" : "Invoice updated");
+    await run(() => send({ action: kind, charge_id: charge.id }), kind === "delete" ? "Invoice deleted" : kind === "retry" ? "Invoice issued" : "Invoice updated");
   };
   return <Box mt="6" p={{ base: "4", md: "6" }} bg="bg.900" borderRadius="xl" border="1px solid" borderColor="whiteAlpha.100">
-    <Flex justify="space-between" align="center" gap="3" mb="4" wrap="wrap"><Heading size="md">Account invoices</Heading><HStack><Button size="sm" variant="ghost" isLoading={busy} isDisabled={loading} onClick={() => void run(() => send({ action: "sync" }), "Invoices refreshed")}>Refresh</Button><Button size="sm" colorScheme="green" leftIcon={<FiPlus />} isDisabled={busy || loading} onClick={() => { setAmount(""); setDescription(""); setFrequency("once"); setDueDays("7"); setRequestKey(crypto.randomUUID()); setError(""); setOpen(true); }}>Issue invoice</Button></HStack></Flex>
+    <Flex justify="space-between" align="center" gap="3" mb="4" wrap="wrap"><Heading size="md">Account invoices</Heading><HStack><Button size="sm" colorScheme="green" leftIcon={<FiPlus />} isDisabled={busy || loading} onClick={() => { setAmount(""); setDescription(""); setFrequency("once"); setDueDays("7"); setRequestKey(crypto.randomUUID()); setError(""); setOpen(true); }}>Issue invoice</Button></HStack></Flex>
     {error && !open ? <Alert status="error" mb="4" borderRadius="lg"><AlertIcon />{error}</Alert> : null}
     {loading ? <Skeleton height="160px" borderRadius="xl" /> : <AccountInvoices charges={charges} adminAction={action} busy={busy} />}
     <Modal isOpen={open} onClose={() => { if (!busy) setOpen(false); }} size="xl" scrollBehavior="inside" isCentered closeOnOverlayClick={!busy} closeOnEsc={!busy}><ModalOverlay backdropFilter="blur(4px)" /><ModalContent bg="bg.900" color="white" mx="4"><ModalHeader>Issue account invoice<Text fontSize="sm" fontWeight="normal" color="whiteAlpha.600" mt="1">{clientName}</Text></ModalHeader><ModalCloseButton isDisabled={busy} /><ModalBody>
@@ -121,7 +131,7 @@ export function AdminAccountInvoices({ clientId, clientName }: { clientId: strin
         <FormControl mb="5" isRequired><FormLabel>Amount</FormLabel><InputGroup size="lg"><InputLeftAddon bg="whiteAlpha.100">$</InputLeftAddon><Input autoFocus aria-label="Invoice amount" inputMode="decimal" value={amount} placeholder="0.00" onChange={(event) => { setAmount(event.target.value); setRequestKey(crypto.randomUUID()); }} /><InputRightAddon bg="transparent" borderLeft="0" fontSize="sm">USD</InputRightAddon></InputGroup></FormControl>
         <FormControl mb="5" isRequired><FormLabel>What is this invoice for?</FormLabel><Textarea value={description} placeholder="For example: outstanding balance for delivery and installation" rows={3} maxLength={1000} onChange={(event) => { setDescription(event.target.value); setRequestKey(crypto.randomUUID()); }} /><Text fontSize="xs" color="whiteAlpha.500" mt="1">Visible to the client and on the Stripe invoice.</Text></FormControl>
         <FormControl mb="5"><FormLabel>Frequency</FormLabel><SimpleGrid columns={3} gap="2">{(["once", "monthly", "yearly"] as const).map((value) => <Button key={value} variant={frequency === value ? "solid" : "outline"} colorScheme={frequency === value ? "green" : "gray"} leftIcon={value === "once" ? <FiFileText /> : <FiRepeat />} onClick={() => { setFrequency(value); setRequestKey(crypto.randomUUID()); }} aria-pressed={frequency === value}>{cadence[value]}</Button>)}</SimpleGrid></FormControl>
-        <FormControl mb="5"><FormLabel>Days to pay each invoice</FormLabel><HStack><Input aria-label="Days to pay" type="number" min={1} max={90} value={dueDays} w="90px" onChange={(event) => { setDueDays(event.target.value); setRequestKey(crypto.randomUUID()); }} /><Text fontSize="sm" color="whiteAlpha.600">days from issue date</Text></HStack></FormControl>
+        <FormControl mb="5"><FormLabel>Days to pay each invoice</FormLabel><HStack><Input aria-label="Days to pay" type="number" min={1} max={90} value={dueDays} w="90px" onChange={(event) => { setDueDays(event.target.value); setRequestKey(crypto.randomUUID()); }} /><Text fontSize="sm" color="whiteAlpha.600">days from issue date</Text></HStack><Text fontSize="xs" color="whiteAlpha.600" mt="2">The invoice becomes overdue after this deadline. It stays payable and never restricts access. This does not change the monthly or yearly billing date.</Text></FormControl>
       </Box>
       <Box p="4" bg="green.900" border="1px solid" borderColor="green.700" borderRadius="lg"><Flex justify="space-between" align="center"><Text fontWeight="semibold">{cadence[frequency]} invoice</Text><Text fontSize="xl" fontWeight="bold">{Number.isFinite(cents) ? money(cents) : "$0.00"}</Text></Flex><Text mt="2" fontSize="sm" color="whiteAlpha.800">{frequency === "once" ? "Issued immediately. The client pays once using a Stripe payment link." : `First invoice issued immediately, then every ${frequency === "monthly" ? "month" : "year"} until stopped. Each invoice has its own payment link.`}</Text><Text mt="2" fontSize="xs" color="whiteAlpha.600">No card is charged when you issue this invoice. No machine is linked and access is never restricted. Without an email, the first recurring payment is due within 23 hours; later renewals use automatic collection.</Text></Box>
     </ModalBody><ModalFooter gap="3"><Button variant="ghost" isDisabled={busy} onClick={() => setOpen(false)}>Cancel</Button><Button colorScheme="green" isDisabled={!valid || busy} isLoading={busy} onClick={() => void create()}>Issue invoice</Button></ModalFooter></ModalContent></Modal>
