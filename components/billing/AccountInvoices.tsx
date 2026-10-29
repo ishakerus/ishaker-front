@@ -69,7 +69,7 @@ export function AccountInvoices({ charges, adminAction, busy }: { charges: Accou
   const visible = charges.filter((charge) => filter === "unpaid" ? charge.outstanding_cents > 0 : filter === "recurring" ? charge.frequency !== "once" && !charge.renewal_canceled && !["canceled", "incomplete_expired"].includes(charge.status) : true)
     .sort((a, b) => Number(b.outstanding_cents > 0) - Number(a.outstanding_cents > 0) || b.id - a.id);
   return <Box id="account-invoices" mb="8" scrollMarginTop="100px">
-    {!adminAction ? <Heading size="md" mb="2">Account invoices</Heading> : null}
+    {!adminAction ? <Heading size="md" mb="2">Account invoices ({charges.length})</Heading> : null}
     <Text fontSize="sm" color="whiteAlpha.600" mb="4">Separate charges for your account. These do not affect machine access.</Text>
     {charges.length ? <>
       <Flex justify="space-between" align="center" mb="4" gap="3" flexWrap="wrap"><HStack spacing="1" bg="blackAlpha.200" p="1" borderRadius="lg">{[["all", "All"], ["unpaid", "Unpaid"], ["recurring", "Recurring"]].map(([value, label]) => <Button key={value} size="sm" variant={filter === value ? "solid" : "ghost"} onClick={() => setFilter(value)} aria-pressed={filter === value}>{label}</Button>)}</HStack><Text fontSize="sm" color="whiteAlpha.700">Outstanding <Text as="span" ml="2" color={outstanding ? "orange.200" : "green.200"} fontWeight="bold">{money(outstanding)}</Text></Text></Flex>

@@ -17,6 +17,13 @@ export type BillingInvoice = {
 export type BillingSubscription = {
   machine_id: number;
   machine_title: string | null;
+  machine_serial_number?: string | null;
+  plan_configured?: boolean;
+  payment_amount_cents?: number | null;
+  invoices?: BillingInvoice[];
+  stripe_cancel_at_period_end?: boolean;
+  stripe_current_period_end?: string | null;
+  stripe_resume_at?: string | null;
   machine_type: string | null;
   subscription_id: number | null;
   starts_at: string | null;
