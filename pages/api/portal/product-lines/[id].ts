@@ -291,6 +291,7 @@ async function handler(req: NextApiRequest, res: NextApiResponse) {
           data: {
             name,
             base_product_line: baseProductLine.id,
+            product_type: baseProductLine.product_type || "powder",
             cups: [cup.id],
             custom_splash: customSplash?.id || null,
             ...(session.access === "client" ? { client: session.client.id } : {}),

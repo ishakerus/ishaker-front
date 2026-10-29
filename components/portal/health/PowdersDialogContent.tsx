@@ -10,9 +10,14 @@ import {
 } from "@chakra-ui/react";
 import Link from "next/link";
 import { useEffect, useMemo, useState } from "react";
-import { getMachineContainerCount } from "../../../lib/portal/containerSlots";
+import {
+  getMachineContainerCount,
+  getMachineSyrupContainerCount,
+} from "../../../lib/portal/containerSlots";
+import { getSharedSyrupCapacity } from "../../../lib/portal/syrupVolume";
 import type { PortalMachineCell } from "../../../types/portal";
 import type { Machine } from "../../../types/strapi";
+import { SyrupContainersPreview } from "../product-lines/SyrupContainersPreview";
 import { ContainersPreview } from "../product-lines/ContainersPreview";
 
 export function PowdersDialogContent({
@@ -110,19 +115,21 @@ export function PowdersDialogContent({
             position: cell.position,
             productId: cell.product ? Number(cell.product.id) : null,
             isActive: cell.isActive,
-            cellCategory: cell.cell_category || "powder",
             amountKg: Number(cell.amount_kg) || 0,
+            ...(containerCount !== null && cell.position > containerCount
+              ? { maxAmountKg: getSharedSyrupCapacity(cells, containerCount) }
+              : {}),
           })),
         }),
       });
       const payload = await response.json().catch(() => null);
       if (!response.ok)
         throw new Error(
-          payload?.message || "Powder amounts could not be saved.",
+          payload?.message || "Container amounts could not be saved.",
         );
       setCells(Array.isArray(payload) ? payload : payload?.cells || []);
       toast({
-        title: "Powder amounts saved",
+        title: "Container amounts saved",
         status: "success",
         duration: 2500,
       });
@@ -132,7 +139,7 @@ export function PowdersDialogContent({
       const message = (reason as Error).message;
       setError(message);
       toast({
-        title: "Could not save powder amounts",
+        title: "Could not save container amounts",
         description: message,
         status: "error",
       });
@@ -153,7 +160,7 @@ export function PowdersDialogContent({
   return (
     <VStack spacing="5" align="stretch">
       <Text color="bg.300">
-        Drag each loaded container to its current powder level.
+        Drag each loaded powder container or syrup bag to its current level.
       </Text>
       {error ? (
         <Alert status="error">
@@ -162,19 +169,37 @@ export function PowdersDialogContent({
         </Alert>
       ) : null}
       {visibleCells.length ? (
-        <ContainersPreview
-          containerCount={containerCount}
-          cells={cells}
-          onAmountChange={(position, amountKg) =>
-            setCells((current) =>
-              current.map((cell) =>
-                cell.position === position
-                  ? { ...cell, amount_kg: amountKg }
-                  : cell,
-              ),
-            )
-          }
-        />
+        <>
+          <ContainersPreview
+            containerCount={containerCount}
+            cells={cells}
+            onAmountChange={(position, amountKg) =>
+              setCells((current) =>
+                current.map((cell) =>
+                  cell.position === position
+                    ? { ...cell, amount_kg: amountKg }
+                    : cell,
+                ),
+              )
+            }
+          />
+          {getMachineSyrupContainerCount(machine.machine_type) > 0 ? (
+            <SyrupContainersPreview
+              powderCount={containerCount}
+              syrupCount={getMachineSyrupContainerCount(machine.machine_type)}
+              cells={cells}
+              onAmountChange={(position, amount) =>
+                setCells((current) =>
+                  current.map((cell) =>
+                    cell.position === position
+                      ? { ...cell, amount_kg: amount }
+                      : cell,
+                  ),
+                )
+              }
+            />
+          ) : null}
+        </>
       ) : (
         <Text color="bg.400">
           No products are assigned to this machine yet.
@@ -187,7 +212,7 @@ export function PowdersDialogContent({
           isLoading={saving}
           isDisabled={!visibleCells.length || !hasChanges}
         >
-          Save powder
+          Save amounts
         </Button>
         <Button
           as={Link}

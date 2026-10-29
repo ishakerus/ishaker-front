@@ -5,6 +5,7 @@ import {
 import { useEffect, useMemo, useState } from "react";
 import type { PortalMachineCell } from "../../../types/portal";
 import type { Machine, SalesSummary } from "../../../types/strapi";
+import { getMachineContainerCount } from "../../../lib/portal/containerSlots";
 
 type Props = {
   machine: Machine;
@@ -68,15 +69,17 @@ export function MachineConsumptionSection({ machine, initialCells }: Props) {
           const usage = usageByCell.get(String(cell.position));
           const used = finite(usage?.powder_g);
           const remaining = finite(cell.amount_kg) * 1000;
+          const powderCount = getMachineContainerCount(machine.machine_type);
+          const unit = powderCount !== null && cell.position > powderCount ? "ml" : "g";
           const days = forecast(remaining, used, period);
-          return <Tr key={cell.id}><Td pl="0">{cell.position}</Td><Td>{cell.product?.product_line?.name || cell.product?.name || "Unassigned"}{cell.product?.taste?.name ? ` · ${cell.product.taste.name}` : ""}</Td><Td isNumeric>{usage?.cups || 0}</Td><Td isNumeric>{used.toFixed(0)} g</Td><Td isNumeric>{remaining.toFixed(0)} g</Td><Td pr="0"><Badge colorScheme={forecastColor(days)}>{forecastLabel(days)}</Badge></Td></Tr>;
+          return <Tr key={cell.id}><Td pl="0">{cell.position}</Td><Td>{cell.product?.product_line?.name || cell.product?.name || "Unassigned"}{cell.product?.taste?.name ? ` · ${cell.product.taste.name}` : ""}</Td><Td isNumeric>{usage?.cups || 0}</Td><Td isNumeric>{used.toFixed(0)} {unit}</Td><Td isNumeric>{remaining.toFixed(0)} {unit}</Td><Td pr="0"><Badge colorScheme={forecastColor(days)}>{forecastLabel(days)}</Badge></Td></Tr>;
         })}</Tbody></Table></TableContainer>
         <SimpleGrid columns={{ base: 1, md: 2 }} spacing="4" mt="5">
           <Box bg="whiteAlpha.50" borderRadius="xl" p="4"><Text color="bg.300" fontSize="sm">Water</Text><Text fontWeight="800">{(finite(summary?.totals.water_ml) / 1000).toFixed(1)} L used · {waterLiters.toFixed(1)} L remaining</Text><Badge mt="2" colorScheme={forecastColor(waterDays)}>{forecastLabel(waterDays)}</Badge></Box>
           <Box bg="whiteAlpha.50" borderRadius="xl" p="4"><Text color="bg.300" fontSize="sm">Cups</Text><Text fontWeight="800">{finite(summary?.totals.cups_used)} used · {cupsRemaining} remaining</Text><Badge mt="2" colorScheme={forecastColor(cupDays)}>{forecastLabel(cupDays)}</Badge></Box>
         </SimpleGrid>
       </> : null}
-      <Text color="bg.300" fontSize="xs" mt="4">Consumption is calculated from the recipe; actual weight can differ because the machine doses powder by time. Current powder, water, and cup remains come from the machine’s post-dispense inventory sync.</Text>
+      <Text color="bg.300" fontSize="xs" mt="4">Consumption is calculated from the recipe; actual amounts can differ because the machine doses by time. Current powder, syrup, water, and cup remains come from the machine’s post-dispense inventory sync.</Text>
     </Box>
   );
 }

@@ -14,19 +14,19 @@ import {
 import {
   clampContainerAmountKg,
   getMachineContainerCount,
+  getMachineSyrupContainerCount,
+  getContainerCategory,
   isValidContainerSlot,
 } from "../../../../../lib/portal/containerSlots";
-import {
-  getProductAssignmentProblems,
-} from "../../../../../lib/portal/productAssignment";
+import { getProductAssignmentProblems } from "../../../../../lib/portal/productAssignment";
 
 type Assignment = {
   cellId: number | null;
   position: number;
   productId: number | null;
   isActive: boolean;
-  cellCategory: "powder" | "concentrate";
   amountKg: number;
+  maxAmountKg?: number | null;
 };
 
 const asId = (value: string | string[] | undefined) => {
@@ -41,16 +41,20 @@ const parseAssignments = (value: unknown): Assignment[] | null => {
     const row = item && typeof item === "object" ? item : {};
     const rawCellId = (row as { cellId?: unknown }).cellId;
     const cellId =
-      rawCellId === null || rawCellId === undefined
-        ? null
-        : Number(rawCellId);
+      rawCellId === null || rawCellId === undefined ? null : Number(rawCellId);
     const position = Number((row as { position?: unknown }).position);
     const rawProductId = (row as { productId?: unknown }).productId;
     const productId = rawProductId === null ? null : Number(rawProductId);
     const isActive = (row as { isActive?: unknown }).isActive;
-    const cellCategory = (row as { cellCategory?: unknown }).cellCategory;
+    const rawMax = (row as { maxAmountKg?: unknown }).maxAmountKg;
+    const maxAmountKg =
+      rawMax === undefined
+        ? undefined
+        : rawMax === null
+          ? null
+          : Number(rawMax);
     const amountKg = Number((row as { amountKg?: unknown }).amountKg ?? 0);
-    return { cellId, position, productId, isActive, cellCategory, amountKg };
+    return { cellId, position, productId, isActive, amountKg, maxAmountKg };
   });
 
   if (
@@ -61,18 +65,23 @@ const parseAssignments = (value: unknown): Assignment[] | null => {
         !Number.isInteger(assignment.position) ||
         assignment.position <= 0 ||
         (assignment.productId !== null &&
-          (!Number.isInteger(assignment.productId) || assignment.productId <= 0)) ||
+          (!Number.isInteger(assignment.productId) ||
+            assignment.productId <= 0)) ||
         typeof assignment.isActive !== "boolean" ||
         !Number.isFinite(assignment.amountKg) ||
         assignment.amountKg < 0 ||
-        (typeof assignment.cellCategory !== "string" ||
-          !["powder", "concentrate"].includes(assignment.cellCategory)),
+        (assignment.maxAmountKg != null &&
+          (!Number.isFinite(assignment.maxAmountKg) ||
+            assignment.maxAmountKg <= 0)),
     )
   ) {
     return null;
   }
 
-  if (new Set(assignments.map((assignment) => assignment.position)).size !== assignments.length) {
+  if (
+    new Set(assignments.map((assignment) => assignment.position)).size !==
+    assignments.length
+  ) {
     return null;
   }
 
@@ -120,10 +129,31 @@ async function handler(req: NextApiRequest, res: NextApiResponse) {
     if (containerCount === null) {
       return res.status(409).json({
         error: "container_count_not_configured",
-        message:
-          "This machine model has no powder container count configured.",
+        message: "This machine model has no powder container count configured.",
       });
     }
+    const syrupCount = getMachineSyrupContainerCount(machine.machine_type);
+    const totalCount = containerCount + syrupCount;
+    const categoryFor = (position: number) =>
+      getContainerCategory(position, containerCount, syrupCount);
+    const withCapacity = (assignment: Assignment) => {
+      const savedCell = cells.find(
+        (cell) => Number(cell.id) === assignment.cellId,
+      );
+      const maxAmountKg =
+        assignment.maxAmountKg === undefined
+          ? savedCell?.max_amount_kg
+          : assignment.maxAmountKg;
+      return {
+        ...assignment,
+        amountKg: clampContainerAmountKg(
+          assignment.amountKg,
+          containerCount,
+          assignment.position,
+          maxAmountKg,
+        ),
+      };
+    };
     if (
       ["POST", "PUT"].includes(req.method || "") &&
       cells.some((cell) => cell.amount_kg === undefined)
@@ -141,26 +171,21 @@ async function handler(req: NextApiRequest, res: NextApiResponse) {
       if (!parsedAssignment) {
         return res.status(400).json({
           error: "invalid_machine_cell",
-          message: "Enter a valid position, category, product, and active state.",
+          message:
+            "Enter a valid position, product, capacity, amount, and active state.",
         });
       }
-      const assignment = {
-        ...parsedAssignment,
-        amountKg: clampContainerAmountKg(
-          parsedAssignment.amountKg,
-          containerCount,
-        ),
-      };
-      if (assignment.position > containerCount) {
+      const assignment = withCapacity(parsedAssignment);
+      if (assignment.position > totalCount) {
         return res.status(400).json({
           error: "invalid_container_slot",
-          message: `Choose a physical container slot from 1 to ${containerCount}.`,
+          message: `Choose a physical container slot from 1 to ${totalCount}.`,
         });
       }
-      if (cells.length >= containerCount) {
+      if (cells.length >= totalCount) {
         return res.status(409).json({
           error: "container_capacity_reached",
-          message: `This machine model has exactly ${containerCount} physical container slots.`,
+          message: `This machine model has exactly ${totalCount} physical container slots.`,
         });
       }
       if (cells.some((cell) => cell.position === assignment.position)) {
@@ -170,7 +195,10 @@ async function handler(req: NextApiRequest, res: NextApiResponse) {
         });
       }
       if (assignment.productId !== null) {
-        const products = await getMachineCatalogProducts(machineId, session.client.id);
+        const products = await getMachineCatalogProducts(
+          machineId,
+          session.client.id,
+        );
         const product = products.find(
           (item) => String(item.id) === String(assignment.productId),
         );
@@ -184,8 +212,11 @@ async function handler(req: NextApiRequest, res: NextApiResponse) {
             message: productProblems[0].detail,
           });
         }
-        if (product.product_type !== assignment.cellCategory) {
-          return res.status(400).json({ error: "category_mismatch" });
+        if (product.product_type !== categoryFor(assignment.position)) {
+          return res.status(400).json({
+            error: "category_mismatch",
+            message: `Container ${assignment.position} requires a ${categoryFor(assignment.position)} product.`,
+          });
         }
         if (
           assignment.isActive &&
@@ -216,21 +247,11 @@ async function handler(req: NextApiRequest, res: NextApiResponse) {
         message: "Assignments must contain valid, unique container positions.",
       });
     }
-    const assignments = parsedAssignments.map((assignment) => ({
-      ...assignment,
-      amountKg: clampContainerAmountKg(
-        assignment.amountKg,
-        containerCount,
-      ),
-    }));
-    if (
-      assignments.some(
-        (assignment) => assignment.position > containerCount,
-      )
-    ) {
+    const assignments = parsedAssignments.map(withCapacity);
+    if (assignments.some((assignment) => assignment.position > totalCount)) {
       return res.status(400).json({
         error: "invalid_container_assignment",
-        message: `Every container must use slots 1 through ${containerCount}.`,
+        message: `Every container must use slots 1 through ${totalCount}.`,
       });
     }
 
@@ -256,7 +277,7 @@ async function handler(req: NextApiRequest, res: NextApiResponse) {
     );
     const staleOmittedCell = omittedCells.find(
       (cell) =>
-        isValidContainerSlot(cell.position, containerCount) &&
+        isValidContainerSlot(cell.position, totalCount) &&
         (positionCounts.get(cell.position) || 0) === 1,
     );
     if (staleOmittedCell) {
@@ -267,9 +288,7 @@ async function handler(req: NextApiRequest, res: NextApiResponse) {
       });
     }
 
-    const cellsById = new Map(
-      cells.map((cell) => [Number(cell.id), cell]),
-    );
+    const cellsById = new Map(cells.map((cell) => [Number(cell.id), cell]));
     const unknownCell = assignments.find(
       (assignment) =>
         assignment.cellId !== null && !cellsById.has(assignment.cellId),
@@ -281,8 +300,27 @@ async function handler(req: NextApiRequest, res: NextApiResponse) {
       });
     }
 
-    const products = await getMachineCatalogProducts(machineId, session.client.id);
-    const productsById = new Map(products.map((product) => [String(product.id), product]));
+    if (
+      assignments.some(
+        (assignment) =>
+          assignment.cellId !== null &&
+          cellsById.get(assignment.cellId)?.position !== assignment.position,
+      )
+    ) {
+      return res.status(400).json({
+        error: "physical_position_changed",
+        message:
+          "A saved container's physical position cannot be changed. Reload and try again.",
+      });
+    }
+
+    const products = await getMachineCatalogProducts(
+      machineId,
+      session.client.id,
+    );
+    const productsById = new Map(
+      products.map((product) => [String(product.id), product]),
+    );
     for (const assignment of assignments) {
       if (assignment.productId === null) continue;
 
@@ -302,10 +340,10 @@ async function handler(req: NextApiRequest, res: NextApiResponse) {
         });
       }
 
-      if (product.product_type !== assignment.cellCategory) {
+      if (product.product_type !== categoryFor(assignment.position)) {
         return res.status(400).json({
           error: "category_mismatch",
-          message: `Container ${assignment.position} requires a ${assignment.cellCategory} product.`,
+          message: `Container ${assignment.position} requires a ${categoryFor(assignment.position)} product.`,
         });
       }
     }
@@ -316,20 +354,25 @@ async function handler(req: NextApiRequest, res: NextApiResponse) {
 
     await Promise.all(
       assignments.map((assignment) => {
+        const keepEmptyBottle =
+          categoryFor(assignment.position) === "concentrate" &&
+          (assignment.cellId !== null || assignment.maxAmountKg != null);
         if (assignment.cellId !== null) {
           const cell = cellsById.get(assignment.cellId)!;
-          if (assignment.productId === null) return deleteMachineCell(cell.id);
+          if (assignment.productId === null && !keepEmptyBottle)
+            return deleteMachineCell(cell.id);
           return updateMachineCell(
             cell.id,
             assignment.position,
             assignment.productId,
             assignment.isActive,
             null,
-            assignment.cellCategory,
             assignment.amountKg,
+            assignment.maxAmountKg,
           );
         }
-        if (assignment.productId === null) return Promise.resolve();
+        if (assignment.productId === null && !keepEmptyBottle)
+          return Promise.resolve();
         return createMachineCell({ machineId, ...assignment, price: null });
       }),
     );
@@ -338,10 +381,24 @@ async function handler(req: NextApiRequest, res: NextApiResponse) {
     return res.status(200).json(refreshedCells);
   } catch (error) {
     console.error("[portal/machines/:id/cells] request failed:", error);
-    return res.status(500).json({
-      error: "machine_cells_request_failed",
-      message: "Machine containers could not be updated.",
-    });
+    const strapiError = error as {
+      status?: number;
+      response?: { error?: { message?: string } };
+    };
+    return res
+      .status(
+        strapiError.status &&
+          strapiError.status >= 400 &&
+          strapiError.status < 500
+          ? strapiError.status
+          : 500,
+      )
+      .json({
+        error: "machine_cells_request_failed",
+        message:
+          strapiError.response?.error?.message ||
+          "Machine containers could not be updated.",
+      });
   }
 }
 

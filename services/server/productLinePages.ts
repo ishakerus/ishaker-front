@@ -437,9 +437,11 @@ const createProductEditorParams = (productLineId: string, session: PortalSession
     params.set("filters[author][id][$eq]", String(session.user.id));
   }
   params.set("fields[0]", "name");
+  params.set("fields[1]", "product_type");
   params.set("populate[cups][populate][image][fields][0]", "url");
   params.set("populate[cups][populate][image][fields][1]", "formats");
   params.set("populate[base_product_line][fields][0]", "name");
+  params.set("populate[base_product_line][fields][1]", "product_type");
   params.set("populate[cannot_be_added_to][fields][0]", "name");
   params.set(
     "populate[base_product_line][populate][cannot_be_added_to][fields][0]",

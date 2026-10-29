@@ -22,6 +22,7 @@ async function submitProduct(
     existingMode?: boolean | null;
     existingOwner?: "unowned" | "another_client";
     clientAccess?: boolean;
+    lineType?: "powder" | "concentrate";
   } = {},
 ) {
   const writes: Array<{ path: string; method: string; data: any }> = [];
@@ -65,6 +66,7 @@ async function submitProduct(
                   {
                     id: 3,
                     name: "Supplements",
+                    product_type: options.lineType,
                     products:
                       options.ownsProduct === false
                         ? []
@@ -408,4 +410,22 @@ test("the existing drink creation flow still saves the full recipe", async (t) =
   assert.equal(result.writes[0].data.dosage.full_drink_volume, 300);
   assert.equal(result.writes[0].data.custom_main, 6);
   assert.deepEqual(result.writes[0].data.can_be_added_to, [8, 9]);
+});
+
+test("new products inherit concentrate and ml from their product line", async (t) => {
+  for (const body of [addon, { ...drink, productType: undefined, servingUnit: undefined }]) {
+    await t.test(body.isDependent ? "add-on" : "drink", async (subtest) => {
+      const result = await submitProduct(subtest, body, { lineType: "concentrate" });
+      assert.equal(result.statusCode, 201);
+      assert.equal(result.writes[0].data.product_type, "concentrate");
+      assert.equal(result.writes[0].data.serving_unit, "ml");
+    });
+  }
+});
+
+test("explicit product types and serving units are preserved in concentrate lines", async (t) => {
+  const result = await submitProduct(t, drink, { lineType: "concentrate" });
+  assert.equal(result.statusCode, 201);
+  assert.equal(result.writes[0].data.product_type, "powder");
+  assert.equal(result.writes[0].data.serving_unit, "g");
 });

@@ -28,7 +28,7 @@ const titles: Record<HealthDialogKind, string> = {
   wifi: "Access your machine remotely",
   nayax: "Nayax payments",
   water: "Water supply",
-  powders: "Powder containers",
+  powders: "Powder and syrup containers",
   cups: "Cup inventory",
   lock: "Machine door lock",
 };

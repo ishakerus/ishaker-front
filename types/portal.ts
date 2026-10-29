@@ -84,6 +84,7 @@ export type PortalMachineCell = {
   product: PortalCatalogProduct | null;
   price?: number | string | null;
   amount_kg?: number | string | null;
+  max_amount_kg?: number | string | null;
 };
 
 export type PortalCurrency = Currency;
@@ -218,6 +219,7 @@ export type PortalBrand = {
 export type PortalProductLine = {
   id: string | number;
   name: string;
+  product_type?: PortalProductType | null;
   isActive?: boolean;
   isPopular?: boolean;
   is_template?: boolean;
@@ -228,7 +230,7 @@ export type PortalProductLine = {
   machines?: Machine[];
   base_product_line?: Pick<
     PortalProductLine,
-    "id" | "name" | "cups" | "can_be_added_to" | "cannot_be_added_to"
+    "id" | "name" | "product_type" | "cups" | "can_be_added_to" | "cannot_be_added_to"
   > | null;
   cups?: PortalCup[];
   brands?: PortalBrand[];

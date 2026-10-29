@@ -126,8 +126,8 @@ export const updateMachineCell = async (
   productId: number | null,
   isActive: boolean,
   price: number | null,
-  cellCategory: "powder" | "concentrate",
   amountKg: number,
+  maxAmountKg?: number | null,
 ) =>
   requestStrapiRestAsService(`/api/machine-cells/${cellId}`, {
     method: "PUT",
@@ -137,8 +137,8 @@ export const updateMachineCell = async (
         product: productId,
         isActive,
         price,
-        cell_category: cellCategory,
         amount_kg: amountKg,
+        ...(maxAmountKg !== undefined ? { max_amount_kg: maxAmountKg } : {}),
       },
     }),
   });
@@ -149,8 +149,8 @@ export const createMachineCell = async (data: {
   productId: number | null;
   isActive: boolean;
   price: number | null;
-  cellCategory: "powder" | "concentrate";
   amountKg: number;
+  maxAmountKg?: number | null;
 }) =>
   requestStrapiRestAsService("/api/machine-cells", {
     method: "POST",
@@ -161,8 +161,8 @@ export const createMachineCell = async (data: {
         product: data.productId,
         isActive: data.isActive,
         price: data.price,
-        cell_category: data.cellCategory,
         amount_kg: data.amountKg,
+        ...(data.maxAmountKg !== undefined ? { max_amount_kg: data.maxAmountKg } : {}),
       },
     }),
   });

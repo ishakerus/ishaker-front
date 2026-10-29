@@ -249,9 +249,9 @@ export async function handler(req: NextApiRequest, res: NextApiResponse) {
   const submittedDosage = parseDosage(req.body?.dosage, isDependent);
   const name = capitalizeName(asString(req.body?.name));
   const description = asString(req.body?.description);
-  const productType = asString(req.body?.productType);
+  let productType = asString(req.body?.productType);
   const productPurpose = asString(req.body?.productPurpose);
-  const servingUnit = asString(req.body?.servingUnit);
+  let servingUnit = asString(req.body?.servingUnit);
   const servingQty = Number(req.body?.servingQty);
 
   if (!productLineId) {
@@ -372,7 +372,7 @@ export async function handler(req: NextApiRequest, res: NextApiResponse) {
       message: "Description must not exceed 2000 characters.",
     });
   }
-  if (!isDependent && !["powder", "concentrate"].includes(productType)) {
+  if (productType && !["powder", "concentrate"].includes(productType)) {
     return res.status(400).json({
       error: "invalid_product_type",
       message: "Select a valid product type.",
@@ -389,7 +389,7 @@ export async function handler(req: NextApiRequest, res: NextApiResponse) {
   }
   if (
     !isDependent &&
-    (!["g", "ml"].includes(servingUnit) ||
+    ((servingUnit && !["g", "ml"].includes(servingUnit)) ||
       !Number.isFinite(servingQty) ||
       servingQty <= 0)
   ) {
@@ -415,6 +415,7 @@ export async function handler(req: NextApiRequest, res: NextApiResponse) {
     String(session.user.id),
   );
   ownershipParams.set("populate[base_product_line][fields][0]", "name");
+  ownershipParams.set("populate[base_product_line][fields][1]", "product_type");
   ownershipParams.set(
     "populate[base_product_line][populate][cups][fields][0]",
     "id",
@@ -456,6 +457,9 @@ export async function handler(req: NextApiRequest, res: NextApiResponse) {
         message: "Product was not found in this product line.",
       });
     }
+
+    productType ||= productLine.product_type || productLine.base_product_line?.product_type || "powder";
+    servingUnit ||= productType === "concentrate" ? "ml" : "g";
 
     const genericProductLineId = productLine.base_product_line?.id;
     if (!genericProductLineId) {
@@ -507,6 +511,8 @@ export async function handler(req: NextApiRequest, res: NextApiResponse) {
           ? requestStrapiRestAsService<
               CreatedProduct & {
                 dosage?: { conversion_factor?: number | string | null };
+                product_type?: "powder" | "concentrate";
+                serving_unit?: "g" | "ml";
               }
             >(`/api/products/${existingProductId}?populate[dosage]=*`)
           : Promise.resolve(null),
@@ -542,10 +548,10 @@ export async function handler(req: NextApiRequest, res: NextApiResponse) {
       const data = {
         name,
         brand: brand.id,
-        product_type: "powder",
+        product_type: isEditing ? existingProduct?.product_type || productType : productType,
         description: null,
         serving_qty: null,
-        serving_unit: "g",
+        serving_unit: isEditing ? existingProduct?.serving_unit || servingUnit : servingUnit,
         components: { set: [] },
         nutrition: [],
         dosage: submittedDosage,

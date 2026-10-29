@@ -152,6 +152,7 @@ export type Machine = {
     id: string | number;
     name?: string;
     container_count?: number | null;
+    syrup_container_count?: number | null;
     preview?: {
       id: string | number;
       name?: string;

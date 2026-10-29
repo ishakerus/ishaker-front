@@ -10,6 +10,7 @@ import {
 import {
   getDuplicateContainerSlots,
   getMachineContainerCount,
+  getMachineTotalContainerCount,
   isValidContainerSlot,
 } from "../../../../../lib/portal/containerSlots";
 
@@ -81,7 +82,7 @@ async function handler(
         message: "Preset and target machine types do not match.",
       });
     }
-    const containerCount = getMachineContainerCount(preset.machine_type);
+    const containerCount = getMachineTotalContainerCount(machine.machine_type);
     const presetPositions: number[] = presetCells.map((cell: Cell) =>
       Number(cell.position),
     );
@@ -155,7 +156,7 @@ async function handler(
         after: {
           productId: presetCell.product?.id || null,
           productName: presetCell.product?.name || null,
-          cellCategory: presetCell.cell_category || "powder",
+          cellCategory: Number(presetCell.position) > (getMachineContainerCount(machine.machine_type) || 0) ? "concentrate" : "powder",
           price: nextPrice,
           isActive: presetCell.isActive !== false,
         },
@@ -243,7 +244,6 @@ async function handler(
               ...(!operation.cellId ? { machine: Number(machineId) } : {}),
               position: operation.position,
               product: operation.after.productId,
-              cell_category: operation.after.cellCategory,
               price: operation.after.price,
               isActive: operation.after.isActive,
             },

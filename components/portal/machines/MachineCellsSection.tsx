@@ -15,22 +15,19 @@ import {
   MenuDivider,
   MenuItem,
   MenuList,
-  Select,
   SimpleGrid,
   Switch,
   Text,
-  Tooltip,
   useToast,
   VStack,
 } from "@chakra-ui/react";
 import Link from "next/link";
 import { useMemo, useState } from "react";
 import { FiCheck, FiChevronDown, FiPlus, FiSave } from "react-icons/fi";
-import { GiPowder } from "react-icons/gi";
-import { IoWaterSharp } from "react-icons/io5";
 import {
   clampContainerAmountKg,
   getContainerMaxAmountKg,
+  getContainerCategory,
   getDuplicateContainerSlots,
   isValidContainerSlot,
 } from "../../../lib/portal/containerSlots";
@@ -44,6 +41,9 @@ import type {
   PortalMachineCell,
 } from "../../../types/portal";
 import { ContainersPreview } from "../product-lines/ContainersPreview";
+import { SyrupContainersPreview } from "../product-lines/SyrupContainersPreview";
+import { SyrupCapacitySelect } from "../product-lines/SyrupCapacitySelect";
+import { getSharedSyrupCapacity } from "../../../lib/portal/syrupVolume";
 import { CONTAINER_WIDTH } from "../product-lines/PowderContainer";
 import { MachineMixesSection } from "./MachineMixesSection";
 import { useCustomDialog } from "../../shared/CustomDialog";
@@ -55,6 +55,7 @@ type MachineCellsSectionProps = {
   catalogProducts: PortalCatalogProduct[];
   loadError?: string | null;
   containerCount: number | null;
+  syrupContainerCount?: number;
   onCellsSaved?: (cells: PortalMachineCell[]) => void;
 };
 
@@ -91,12 +92,12 @@ const hydrateCell = (cell: PortalMachineCell): CellDraft => ({
   cellCategory: cell.cell_category || "powder",
 });
 
-const emptySlot = (position: number): CellDraft => ({
+const emptySlot = (position: number, powderCount: number): CellDraft => ({
   id: null,
   position,
   isActive: true,
-  cell_category: "powder",
-  cellCategory: "powder",
+  cell_category: position > powderCount ? "concentrate" : "powder",
+  cellCategory: position > powderCount ? "concentrate" : "powder",
   product: null,
   productId: "",
 });
@@ -104,22 +105,36 @@ const emptySlot = (position: number): CellDraft => ({
 const buildDrafts = (
   initialCells: PortalMachineCell[],
   containerCount: number | null,
+  syrupCount: number,
 ) => {
+  const totalCount =
+    containerCount === null ? null : containerCount + syrupCount;
+  const syrupCapacity = getSharedSyrupCapacity(
+    initialCells,
+    containerCount || 0,
+  );
   const existing = initialCells.map((cell) => {
     const hydrated = hydrateCell(cell);
     return containerCount
       ? {
           ...hydrated,
+          cellCategory:
+            getContainerCategory(cell.position, containerCount, syrupCount) ||
+            "powder",
           amount_kg: clampContainerAmountKg(
             hydrated.amount_kg,
             containerCount,
+            hydrated.position,
+            hydrated.position > containerCount
+              ? syrupCapacity
+              : hydrated.max_amount_kg,
           ),
         }
       : hydrated;
   });
   if (!containerCount) return existing;
 
-  return Array.from({ length: containerCount }, (_, index) => {
+  const slots = Array.from({ length: totalCount || 0 }, (_, index) => {
     const position = index + 1;
     const savedAtPosition = existing
       .filter((cell) => cell.position === position)
@@ -127,8 +142,17 @@ const buildDrafts = (
 
     // If legacy data contains duplicates, keep the newest saved assignment as
     // the visible value for this one physical slot. Saving removes the extras.
-    return savedAtPosition[0] || emptySlot(position);
+    const cell = savedAtPosition[0] || emptySlot(position, containerCount);
+    return position > containerCount
+      ? { ...cell, max_amount_kg: syrupCapacity }
+      : cell;
   });
+  return [
+    ...slots,
+    ...existing.filter(
+      (cell) => !isValidContainerSlot(cell.position, totalCount),
+    ),
+  ];
 };
 
 const productLabel = (product: PortalCatalogProduct) => {
@@ -149,13 +173,16 @@ export function MachineCellsSection({
   catalogProducts,
   loadError,
   containerCount,
+  syrupContainerCount = 0,
   onCellsSaved,
 }: MachineCellsSectionProps) {
   const toast = useToast();
   const { showConfirm } = useCustomDialog();
   const [cells, setCells] = useState(() =>
-    buildDrafts(initialCells, containerCount),
+    buildDrafts(initialCells, containerCount, syrupContainerCount),
   );
+  const totalCount =
+    containerCount === null ? null : containerCount + syrupContainerCount;
   const [isSaving, setIsSaving] = useState(false);
   const [deletingCellId, setDeletingCellId] = useState<number | null>(null);
   const [saveError, setSaveError] = useState("");
@@ -177,7 +204,7 @@ export function MachineCellsSection({
   const invalidLegacyCells = cells.filter(
     (cell) =>
       cell.id !== null &&
-      (!isValidContainerSlot(cell.position, containerCount) ||
+      (!isValidContainerSlot(cell.position, totalCount) ||
         duplicatePositions.has(cell.position)),
   );
   const selectedProductProblems = cells.flatMap((cell) => {
@@ -199,9 +226,6 @@ export function MachineCellsSection({
   const emptyAssignedContainers = cells.filter(
     (cell) => cell.productId && (Number(cell.amount_kg) || 0) <= 0,
   );
-  const defaultAssignedAmountKg = containerCount
-    ? getContainerMaxAmountKg(containerCount) * 0.7
-    : 0;
   const hasValidationError =
     containerCount === null ||
     invalidLegacyCells.length > 0 ||
@@ -211,34 +235,27 @@ export function MachineCellsSection({
   const updateCell = (
     target: CellDraft,
     patch: Partial<
-      Pick<
-        CellDraft,
-        "position" | "productId" | "isActive" | "cellCategory" | "amount_kg"
-      >
+      Pick<CellDraft, "productId" | "isActive" | "amount_kg" | "max_amount_kg">
     >,
   ) => {
     setCells((current) => {
-      const nextPosition = patch.position;
-      const withoutEmptyDestination =
-        nextPosition === undefined
-          ? current
-          : current.filter(
-              (cell) =>
-                !(
-                  cell !== target &&
-                  cell.id === null &&
-                  !cell.productId &&
-                  cell.position === nextPosition
-                ),
-            );
-      return withoutEmptyDestination.map((cell) =>
+      return current.map((cell) =>
         cell === target
           ? {
               ...cell,
               ...patch,
               ...(patch.productId !== undefined &&
               patch.productId !== cell.productId
-                ? { amount_kg: patch.productId ? defaultAssignedAmountKg : 0 }
+                ? {
+                    amount_kg:
+                      patch.productId && containerCount
+                        ? getContainerMaxAmountKg(
+                            containerCount,
+                            cell.position,
+                            cell.max_amount_kg,
+                          ) * 0.7
+                        : 0,
+                  }
                 : {}),
             }
           : cell,
@@ -332,8 +349,15 @@ export function MachineCellsSection({
             position: cell.position,
             productId: cell.productId ? Number(cell.productId) : null,
             isActive: cell.isActive,
-            cellCategory: cell.cellCategory,
             amountKg: Number(cell.amount_kg) || 0,
+            ...(cell.position > (containerCount || 0)
+              ? {
+                  maxAmountKg:
+                    cell.max_amount_kg == null
+                      ? null
+                      : Number(cell.max_amount_kg),
+                }
+              : {}),
           })),
         }),
       });
@@ -346,7 +370,7 @@ export function MachineCellsSection({
       const refreshed = (
         Array.isArray(payload) ? payload : payload?.cells || []
       ) as PortalMachineCell[];
-      setCells(buildDrafts(refreshed, containerCount));
+      setCells(buildDrafts(refreshed, containerCount, syrupContainerCount));
       onCellsSaved?.(refreshed);
       const updateNotice =
         "Changes will be applied within 2–5 minutes if the machine is online.";
@@ -359,7 +383,7 @@ export function MachineCellsSection({
                   : `Containers ${emptyAssignedContainers
                       .map((cell) => cell.position)
                       .join(", ")} have products but are empty.`,
-              description: `Click on the container to set the powder volume. ${updateNotice}`,
+              description: `Click on the container to set the remaining amount. ${updateNotice}`,
               status: "warning",
               duration: 7000,
               isClosable: true,
@@ -410,7 +434,7 @@ export function MachineCellsSection({
         );
       }
       const refreshed = (payload?.cells || []) as PortalMachineCell[];
-      setCells(buildDrafts(refreshed, containerCount));
+      setCells(buildDrafts(refreshed, containerCount, syrupContainerCount));
       onCellsSaved?.(refreshed);
       toast({
         title: "Duplicate assignment deleted",
@@ -432,12 +456,13 @@ export function MachineCellsSection({
 
   const renderSlot = (cell: CellDraft, isLegacy = false) => {
     const selectedProduct = productsById.get(cell.productId);
+    const isSyrup = cell.cellCategory === "concentrate";
     const productProblems = selectedProduct
       ? getProductAssignmentProblems(selectedProduct)
       : [];
     const categoryMismatch = Boolean(
       selectedProduct?.product_type &&
-      selectedProduct.product_type !== cell.cellCategory,
+        selectedProduct.product_type !== cell.cellCategory,
     );
     return (
       <Box
@@ -449,57 +474,9 @@ export function MachineCellsSection({
         p="4"
       >
         <HStack justify="space-between" mb="4">
-          <HStack
-            spacing="1"
-            flexShrink={0}
-            bg="bg.900"
-            border="1px solid"
-            borderColor="whiteAlpha.200"
-            borderRadius="md"
-            p="0.5"
-          >
-            <Tooltip label="Powder">
-              <IconButton
-                aria-label={`Powder container ${cell.position}`}
-                aria-pressed={cell.cellCategory === "powder"}
-                icon={<GiPowder size="1.5rem" />}
-                size="sm"
-                maxH="6"
-                p="0"
-                minW="8"
-                variant={cell.cellCategory === "powder" ? "solid" : "ghost"}
-                bg={cell.cellCategory === "powder" ? "#D8C3A5" : "transparent"}
-                color={cell.cellCategory === "powder" ? "#3B2F24" : "bg.300"}
-                _hover={{
-                  bg:
-                    cell.cellCategory === "powder"
-                      ? "#CBB28F"
-                      : "whiteAlpha.100",
-                }}
-                onClick={() => updateCell(cell, { cellCategory: "powder" })}
-              />
-            </Tooltip>
-            <Tooltip label="Concentrate">
-              <IconButton
-                aria-label={`Concentrate container ${cell.position}`}
-                aria-pressed={cell.cellCategory === "concentrate"}
-                icon={<IoWaterSharp size="1.5rem" />}
-                size="sm"
-                maxH="6"
-                p="0"
-                minW="8"
-                variant={
-                  cell.cellCategory === "concentrate" ? "solid" : "ghost"
-                }
-                colorScheme={
-                  cell.cellCategory === "concentrate" ? "blue" : "gray"
-                }
-                onClick={() =>
-                  updateCell(cell, { cellCategory: "concentrate" })
-                }
-              />
-            </Tooltip>
-          </HStack>
+          <Badge colorScheme={isSyrup ? "blue" : "orange"}>
+            {isSyrup ? "Syrup" : "Powder"}
+          </Badge>
           <Text fontWeight="800" fontSize="lg">
             {isLegacy ? "Invalid container" : `Container ${cell.position}`}
           </Text>
@@ -518,44 +495,6 @@ export function MachineCellsSection({
           </HStack>
         </HStack>
         <VStack align="stretch" spacing="3">
-          {isLegacy ? (
-            <FormControl isInvalid>
-              <Select
-                value={
-                  isValidContainerSlot(cell.position, containerCount)
-                    ? cell.position
-                    : ""
-                }
-                placeholder={`Invalid saved position (${cell.position})`}
-                bg="bg.900"
-                onChange={(event) =>
-                  updateCell(cell, { position: Number(event.target.value) })
-                }
-              >
-                {Array.from(
-                  { length: containerCount || 0 },
-                  (_, index) => index + 1,
-                )
-                  .filter(
-                    (position) =>
-                      !cells.some(
-                        (other) =>
-                          other !== cell &&
-                          (other.id !== null || other.productId) &&
-                          other.position === position,
-                      ),
-                  )
-                  .map((position) => (
-                    <option key={position} value={position}>
-                      Container {position}
-                    </option>
-                  ))}
-              </Select>
-              <FormErrorMessage>
-                Choose one unoccupied physical container.
-              </FormErrorMessage>
-            </FormControl>
-          ) : null}
           <FormControl
             isInvalid={productProblems.length > 0 || categoryMismatch}
           >
@@ -637,68 +576,74 @@ export function MachineCellsSection({
                   <Text flex="1">— Empty —</Text>
                   {!cell.productId ? <FiCheck /> : null}
                 </MenuItem>
-                {catalogProducts.map((product) => {
-                  const unavailable = !canAssignProduct(product);
-                  const isSelected = String(product.id) === cell.productId;
-                  const imageUrl = productImageUrl(product);
-                  return (
-                    <MenuItem
-                      key={product.id}
-                      isDisabled={unavailable && !isSelected}
-                      bg={isSelected ? "whiteAlpha.100" : "transparent"}
-                      borderRadius="md"
-                      minH="56px"
-                      onClick={() =>
-                        updateCell(cell, { productId: String(product.id) })
-                      }
-                      _hover={{ bg: "whiteAlpha.100" }}
-                      _focus={{ bg: "whiteAlpha.100" }}
-                    >
-                      {imageUrl ? (
-                        <Image
-                          src={imageUrl}
-                          alt=""
-                          boxSize="40px"
-                          objectFit="contain"
-                          borderRadius="md"
-                          bg="whiteAlpha.100"
-                          mr="3"
-                          flexShrink={0}
-                        />
-                      ) : (
-                        <Box
-                          boxSize="40px"
-                          borderRadius="md"
-                          bg="whiteAlpha.100"
-                          mr="3"
-                          flexShrink={0}
-                        />
-                      )}
-                      <Box flex="1" minW="0">
-                        <HStack spacing="2">
-                          <Text
-                            noOfLines={product.is_dependent ? 2 : 1}
-                            whiteSpace="normal"
-                            minW="0"
-                          >
-                            {productLabel(product)}
-                          </Text>
-                          {product.is_dependent ? (
-                            <Badge colorScheme="purple" flexShrink={0}>
-                              Add-on
-                            </Badge>
+                {catalogProducts
+                  .filter(
+                    (product) =>
+                      product.product_type === cell.cellCategory ||
+                      String(product.id) === cell.productId,
+                  )
+                  .map((product) => {
+                    const unavailable = !canAssignProduct(product);
+                    const isSelected = String(product.id) === cell.productId;
+                    const imageUrl = productImageUrl(product);
+                    return (
+                      <MenuItem
+                        key={product.id}
+                        isDisabled={unavailable && !isSelected}
+                        bg={isSelected ? "whiteAlpha.100" : "transparent"}
+                        borderRadius="md"
+                        minH="56px"
+                        onClick={() =>
+                          updateCell(cell, { productId: String(product.id) })
+                        }
+                        _hover={{ bg: "whiteAlpha.100" }}
+                        _focus={{ bg: "whiteAlpha.100" }}
+                      >
+                        {imageUrl ? (
+                          <Image
+                            src={imageUrl}
+                            alt=""
+                            boxSize="40px"
+                            objectFit="contain"
+                            borderRadius="md"
+                            bg="whiteAlpha.100"
+                            mr="3"
+                            flexShrink={0}
+                          />
+                        ) : (
+                          <Box
+                            boxSize="40px"
+                            borderRadius="md"
+                            bg="whiteAlpha.100"
+                            mr="3"
+                            flexShrink={0}
+                          />
+                        )}
+                        <Box flex="1" minW="0">
+                          <HStack spacing="2">
+                            <Text
+                              noOfLines={product.is_dependent ? 2 : 1}
+                              whiteSpace="normal"
+                              minW="0"
+                            >
+                              {productLabel(product)}
+                            </Text>
+                            {product.is_dependent ? (
+                              <Badge colorScheme="purple" flexShrink={0}>
+                                Add-on
+                              </Badge>
+                            ) : null}
+                          </HStack>
+                          {unavailable ? (
+                            <Text color="orange.200" fontSize="xs">
+                              Unavailable
+                            </Text>
                           ) : null}
-                        </HStack>
-                        {unavailable ? (
-                          <Text color="orange.200" fontSize="xs">
-                            Unavailable
-                          </Text>
-                        ) : null}
-                      </Box>
-                      {isSelected ? <FiCheck /> : null}
-                    </MenuItem>
-                  );
-                })}
+                        </Box>
+                        {isSelected ? <FiCheck /> : null}
+                      </MenuItem>
+                    );
+                  })}
                 <MenuDivider borderColor="whiteAlpha.200" />
                 <MenuItem
                   as={Link}
@@ -738,8 +683,25 @@ export function MachineCellsSection({
     );
   };
 
+  const syrupCapacity = getSharedSyrupCapacity(cells, containerCount || 0);
+  const updateSyrupCapacity = (capacity: number) => {
+    setCells((current) =>
+      current.map((cell) =>
+        cell.cellCategory === "concentrate"
+          ? {
+              ...cell,
+              max_amount_kg: capacity,
+              amount_kg: Math.min(Number(cell.amount_kg) || 0, capacity),
+            }
+          : cell,
+      ),
+    );
+    setSaveError("");
+    setPlanogram(null);
+  };
+
   const slots = Array.from(
-    { length: containerCount || 0 },
+    { length: totalCount || 0 },
     (_, index) => index + 1,
   );
   const primaryCells = slots.map((position) => {
@@ -747,7 +709,7 @@ export function MachineCellsSection({
       (cell) =>
         cell.position === position && !invalidLegacyCells.includes(cell),
     );
-    return matches[0] || emptySlot(position);
+    return matches[0] || emptySlot(position, containerCount || 0);
   });
   const previewCells: PortalMachineCell[] = primaryCells.map((cell) => ({
     id: cell.id || -cell.position,
@@ -757,25 +719,30 @@ export function MachineCellsSection({
     product: productsById.get(cell.productId) || null,
     price: cell.price,
     amount_kg: cell.amount_kg,
+    max_amount_kg: cell.max_amount_kg,
   }));
-  const containersPreview = containerCount !== null ? (
-    <ContainersPreview
-      containerCount={containerCount}
-      cells={previewCells}
-      onAmountChange={(position, amountKg) => {
-        const cell = primaryCells.find(
-          (candidate) => candidate.position === position,
-        );
-        if (cell) updateCell(cell, { amount_kg: amountKg });
-      }}
-    />
-  ) : null;
+  const onAmountChange = (position: number, amountKg: number) => {
+    const cell = primaryCells.find(
+      (candidate) => candidate.position === position,
+    );
+    if (cell) updateCell(cell, { amount_kg: amountKg });
+  };
+  const containersPreview =
+    containerCount !== null ? (
+      <ContainersPreview
+        containerCount={containerCount}
+        cells={previewCells}
+        onAmountChange={onAmountChange}
+      />
+    ) : null;
   const assignmentCards = (
     <SimpleGrid
       columns={{ base: 1, xl: containerCount === 4 ? 1 : 3 }}
       spacing="4"
     >
-      {primaryCells.map((cell) => renderSlot(cell))}
+      {primaryCells
+        .filter((cell) => cell.cellCategory === "powder")
+        .map((cell) => renderSlot(cell))}
     </SimpleGrid>
   );
 
@@ -795,7 +762,7 @@ export function MachineCellsSection({
               Container assignment
             </Text>
             <Text color="bg.300" mt="1" fontSize="sm">
-              Click and hold a container powder level to edit it.
+              Drag a powder or syrup level to edit the remaining amount.
             </Text>
           </Box>
           <IconButton
@@ -933,6 +900,59 @@ export function MachineCellsSection({
             {assignmentCards}
           </>
         )}
+        {syrupContainerCount > 0 && containerCount !== null ? (
+          <Box
+            role="group"
+            aria-label="Syrup containers"
+            borderTop="1px solid"
+            borderColor="whiteAlpha.200"
+            pt="6"
+          >
+            <HStack
+              justify="space-between"
+              align="end"
+              flexWrap="wrap"
+              gap="4"
+              mb="5"
+            >
+              <Text fontSize="lg" fontWeight="800" color="blue.200">
+                Syrup containers · {containerCount + 1}–{totalCount}
+              </Text>
+              <SyrupCapacitySelect
+                capacity={syrupCapacity}
+                onChange={updateSyrupCapacity}
+              />
+            </HStack>
+            <Grid
+              templateColumns={{
+                base: "minmax(0, 1fr)",
+                xl: "minmax(0, 1fr) minmax(360px, 440px)",
+              }}
+              gap="6"
+              alignItems="start"
+            >
+              <Box
+                w="full"
+                minW="0"
+                maxW={{ xl: `${CONTAINER_WIDTH * 4 + 48}px` }}
+                mx="auto"
+              >
+                <SyrupContainersPreview
+                  powderCount={containerCount}
+                  syrupCount={syrupContainerCount}
+                  capacityLitres={syrupCapacity}
+                  cells={previewCells}
+                  onAmountChange={onAmountChange}
+                />
+              </Box>
+              <VStack align="stretch" spacing="4">
+                {primaryCells
+                  .filter((cell) => cell.cellCategory === "concentrate")
+                  .map((cell) => renderSlot(cell))}
+              </VStack>
+            </Grid>
+          </Box>
+        ) : null}
         <MachineMixesSection cells={previewCells} />
         {invalidLegacyCells.length ? (
           <Box>

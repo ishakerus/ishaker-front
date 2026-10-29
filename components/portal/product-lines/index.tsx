@@ -34,7 +34,7 @@ import type {
   PortalSession,
 } from "../../../types/portal";
 import type { Machine } from "../../../types/strapi";
-import { getMachineContainerCount } from "../../../lib/portal/containerSlots";
+import { getMachineContainerCount, getMachineSyrupContainerCount } from "../../../lib/portal/containerSlots";
 import { capitalizeName } from "../../../lib/formatName";
 import { getSmallestMediaUrl } from "../../../lib/portal/media";
 import { PortalShell } from "../PortalShell";
@@ -369,6 +369,7 @@ export function ProductLinesPage({
               catalogProducts={catalogProducts}
               loadError={selectedAssignment.loadError}
               containerCount={selectedContainerCount}
+              syrupContainerCount={getMachineSyrupContainerCount(selectedAssignment.machine.machine_type)}
               onCellsSaved={(cells) =>
                 replaceMachineCells(selectedAssignment.machine.id, cells)
               }

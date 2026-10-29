@@ -1,5 +1,6 @@
 export type MachineTypeContainerSource = {
   container_count?: unknown;
+  syrup_container_count?: unknown;
   name?: unknown;
 };
 
@@ -28,16 +29,55 @@ export const getMachineContainerCount = (
   return null;
 };
 
-export const getContainerMaxAmountKg = (containerCount: number) =>
-  containerCount === 8 ? 5.5 : 1.5;
+export const getMachineSyrupContainerCount = (
+  machineType?: MachineTypeContainerSource | null,
+) => {
+  const count = Number(machineType?.syrup_container_count);
+  return Number.isInteger(count) && count >= 0 ? count : 0;
+};
+
+export const getMachineTotalContainerCount = (
+  machineType?: MachineTypeContainerSource | null,
+) => {
+  const powderCount = getMachineContainerCount(machineType);
+  return powderCount === null
+    ? null
+    : powderCount + getMachineSyrupContainerCount(machineType);
+};
+
+export const getContainerCategory = (
+  position: number,
+  powderCount: number,
+  syrupCount: number,
+): "powder" | "concentrate" | null => {
+  if (!isValidContainerSlot(position, powderCount + syrupCount)) return null;
+  return position <= powderCount ? "powder" : "concentrate";
+};
+
+// amount_kg and max_amount_kg store kilograms for powder and litres for syrup.
+export const getContainerMaxAmountKg = (
+  containerCount: number,
+  position = 1,
+  maxAmountKg?: unknown,
+) => {
+  const configured = Number(maxAmountKg);
+  if (Number.isFinite(configured) && configured > 0) return configured;
+  if (position > containerCount) return 3;
+  return containerCount === 8 ? 5.5 : 1.5;
+};
 
 export const clampContainerAmountKg = (
   amountKg: unknown,
   containerCount: number,
+  position = 1,
+  maxAmountKg?: unknown,
 ) => {
   const amount = Number(amountKg);
   if (!Number.isFinite(amount) || amount <= 0) return 0;
-  return Math.min(amount, getContainerMaxAmountKg(containerCount));
+  return Math.min(
+    amount,
+    getContainerMaxAmountKg(containerCount, position, maxAmountKg),
+  );
 };
 
 export const getLowestFreeContainerSlot = (

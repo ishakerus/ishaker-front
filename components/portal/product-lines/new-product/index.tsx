@@ -327,7 +327,7 @@ export function NewProductPage({
     initialProduct?.description || "",
   );
   const [productType, setProductType] = useState<PortalProductType>(
-    initialProduct?.product_type === "concentrate" ? "concentrate" : "powder",
+    initialProduct?.product_type || productLine.product_type || productLine.base_product_line?.product_type || "powder",
   );
   const [productPurpose, setProductPurpose] = useState<PortalProductPurpose>(
     initialProduct?.product_purpose === "milkshake"
@@ -341,7 +341,7 @@ export function NewProductPage({
       : "100",
   );
   const [servingUnit, setServingUnit] = useState<"g" | "ml">(
-    initialProduct?.serving_unit === "ml" ? "ml" : "g",
+    initialProduct?.serving_unit || ((initialProduct?.product_type || productLine.product_type || productLine.base_product_line?.product_type) === "concentrate" ? "ml" : "g"),
   );
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [addonDosage, setAddonDosage] = useState(
@@ -709,7 +709,7 @@ export function NewProductPage({
         : "";
     setDescription(selected?.description || "");
     setProductType(
-      selected?.product_type === "concentrate" ? "concentrate" : "powder",
+      selected?.product_type || productLine.product_type || productLine.base_product_line?.product_type || "powder",
     );
     setProductPurpose(
       selected?.product_purpose === "milkshake"
@@ -721,7 +721,7 @@ export function NewProductPage({
         ? String(selected.serving_qty)
         : "100",
     );
-    setServingUnit(selected?.serving_unit === "ml" ? "ml" : "g");
+    setServingUnit(selected?.serving_unit || ((selected?.product_type || productLine.product_type || productLine.base_product_line?.product_type) === "concentrate" ? "ml" : "g"));
     setCanBeAddedToIds([]);
     setComponentRows(toComponentRows(selected));
     setDosage(toDosageValue(selected, !isEditing));
