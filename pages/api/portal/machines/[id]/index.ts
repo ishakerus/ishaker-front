@@ -5,6 +5,7 @@ import {
   getPortalSessionFromApiRequest,
 } from "../../../../../lib/portal/auth";
 import { updateMachineRegistrationData } from "../../../../../services/server/machineRegistration";
+import { MACHINE_TITLE_MAX_LENGTH } from "../../../../../lib/portal/machineName";
 import { requestStrapiRestAsService } from "../../../../../services/server/strapiClient";
 import {
   addPortalMachineFields,
@@ -45,6 +46,7 @@ async function handler(
     return res.status(403).json({ error: "machine_access_denied" });
   }
 
+  const titleProvided = hasOwn(req.body, "title");
   const countryProvided = hasOwn(req.body, "country");
   const stateProvided = hasOwn(req.body, "state");
   const cityProvided = hasOwn(req.body, "city");
@@ -53,6 +55,7 @@ async function handler(
   const nayaxProvided = hasOwn(req.body, "nayaxTerminalId");
   const wrapProductlineProvided = hasOwn(req.body, "wrap_productline");
   if (
+    !titleProvided &&
     !countryProvided &&
     !stateProvided &&
     !cityProvided &&
@@ -62,6 +65,13 @@ async function handler(
     !wrapProductlineProvided
   ) {
     return res.status(400).json({ error: "no_machine_updates" });
+  }
+  const title = asString(req.body?.title);
+  if (titleProvided && (!title || title.length > MACHINE_TITLE_MAX_LENGTH)) {
+    return res.status(400).json({
+      error: "invalid_machine_title",
+      message: `Enter a machine name between 1 and ${MACHINE_TITLE_MAX_LENGTH} characters.`,
+    });
   }
   if (nayaxProvided && typeof req.body?.nayaxTerminalId !== "string") {
     return res.status(400).json({ error: "invalid_nayax_terminal_id" });
@@ -137,6 +147,7 @@ async function handler(
       ? await updateMachineRegistrationData({
           client: session.client,
           machine,
+          title: titleProvided ? title : undefined,
           country,
           stateRegion,
           city,
@@ -153,6 +164,7 @@ async function handler(
             method: "PUT",
             body: JSON.stringify({
               data: {
+                ...(titleProvided ? { title } : {}),
                 ...(currency ? { currency: currency.id } : {}),
                 ...(language ? { language: language.id } : {}),
                 ...(nayaxProvided
@@ -174,7 +186,7 @@ async function handler(
     console.error("[portal/machines/:id] update failed:", error);
     return res.status(500).json({
       error: "machine_update_failed",
-      message: "Machine registration data could not be updated.",
+      message: "Machine data could not be updated.",
     });
   }
 }

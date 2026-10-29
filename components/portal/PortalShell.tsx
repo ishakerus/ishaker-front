@@ -44,6 +44,7 @@ import {
 
 type PortalShellProps = PropsWithChildren<{
   title: string;
+  titleAction?: ReactNode;
   description?: string;
   clientName?: string;
   access?: "client" | "product";
@@ -65,6 +66,7 @@ const whatsappBotUrl = "https://wa.me/18573927028";
 
 export function PortalShell({
   title,
+  titleAction,
   description,
   clientName,
   access = "client",
@@ -404,15 +406,20 @@ export function PortalShell({
               gap="5"
               order="1"
             >
-              <VStack spacing="1" align="stretch">
-                <Text
-                  color="white"
-                  fontSize={{ base: "2xl", md: "3xl" }}
-                  lineHeight="1.2"
-                  fontWeight="750"
-                >
-                  {title}
-                </Text>
+              <VStack spacing="1" align="stretch" minW="0">
+                <HStack spacing="2" minW="0">
+                  <Text
+                    color="white"
+                    fontSize={{ base: "2xl", md: "3xl" }}
+                    lineHeight="1.2"
+                    fontWeight="750"
+                    minW="0"
+                    overflowWrap="anywhere"
+                  >
+                    {title}
+                  </Text>
+                  {titleAction}
+                </HStack>
                 {description ? (
                   <Text
                     color="whiteAlpha.600"

@@ -59,7 +59,25 @@ export default function ProductLinesRoute() {
 
   return (
     <PortalPageContent session={data.session}>
-      <ProductLinesPage {...data} />
+      <ProductLinesPage
+        {...data}
+        onMachineRenamed={(id, title) => {
+          void mutate((current) => current ? {
+            ...current,
+            session: {
+              ...current.session,
+              machines: current.session.machines.map((machine) =>
+                String(machine.id) === String(id) ? { ...machine, title } : machine,
+              ),
+            },
+            machineAssignments: current.machineAssignments.map((assignment) =>
+              String(assignment.machine.id) === String(id)
+                ? { ...assignment, machine: { ...assignment.machine, title } }
+                : assignment,
+            ),
+          } : current, { revalidate: false });
+        }}
+      />
     </PortalPageContent>
   );
 }

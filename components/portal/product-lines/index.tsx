@@ -40,6 +40,7 @@ import { getSmallestMediaUrl } from "../../../lib/portal/media";
 import { PortalShell } from "../PortalShell";
 import { MachineCellsSection } from "../machines/MachineCellsSection";
 import { MachineConsumptionSection } from "../machines/MachineConsumptionSection";
+import { MachineNameEditor } from "../machines/MachineNameEditor";
 import { OrphanProductCard } from "./OrphanProductCard";
 import { ProductLineCard } from "./ProductLineCard";
 import { getProductLineIcon } from "./NewProductLinePage";
@@ -61,16 +62,19 @@ export type ProductLinesPageProps = {
   initialMachineId?: string;
   initialNewProduct?: boolean;
   loadError?: string;
+  onMachineRenamed?: (id: string | number, title: string) => void;
 };
 
 type MachineSelectorContentProps = {
   machine: Machine;
   isSelected?: boolean;
+  hasNameAction?: boolean;
 };
 
 function MachineSelectorContent({
   machine,
   isSelected = false,
+  hasNameAction = false,
 }: MachineSelectorContentProps) {
   const previewUrl = getSmallestMediaUrl(machine.machine_type?.preview);
   const title = machine.title || `Machine #${machine.id}`;
@@ -108,6 +112,7 @@ function MachineSelectorContent({
           fontSize={{ base: "md", sm: "lg" }}
           lineHeight="short"
           noOfLines={2}
+          pr={hasNameAction ? "8" : undefined}
         >
           {title}
         </Text>
@@ -153,6 +158,7 @@ export function ProductLinesPage({
   initialMachineId,
   initialNewProduct = false,
   loadError,
+  onMachineRenamed,
 }: ProductLinesPageProps) {
   const router = useRouter();
   const scrolledToProductLine = useRef<string | null>(null);
@@ -304,7 +310,10 @@ export function ProductLinesPage({
             _active={{ bg: "bg.800", borderColor: "acid.300" }}
             _expanded={{ bg: "bg.800", borderColor: "acid.300" }}
           >
-            <MachineSelectorContent machine={selectedAssignment.machine} />
+            <MachineSelectorContent
+              machine={selectedAssignment.machine}
+              hasNameAction={session.access === "client" && Boolean(onMachineRenamed)}
+            />
           </MenuButton>
           <MenuList
             bg="bg.900"
@@ -337,6 +346,14 @@ export function ProductLinesPage({
             })}
           </MenuList>
         </Menu>
+        {session.access === "client" && selectedAssignment && onMachineRenamed ? (
+          <Box position="absolute" right="12" top={{ base: "3", sm: "3.5" }}>
+            <MachineNameEditor
+              machine={selectedAssignment.machine}
+              onSaved={(title) => onMachineRenamed(selectedAssignment.machine.id, title)}
+            />
+          </Box>
+        ) : null}
       </FormControl>
       {loadError ? (
         <Text color="orange.200" mb="5">

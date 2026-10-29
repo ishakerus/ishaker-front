@@ -17,6 +17,7 @@ import {
   PortalPageLoading,
 } from "../../components/portal/PortalPageState";
 import { MachineRegistrationEditor } from "../../components/portal/machines/MachineRegistrationEditor";
+import { MachineNameEditor } from "../../components/portal/machines/MachineNameEditor";
 import { MachineDoorUnlock } from "../../components/portal/machines/MachineDoorUnlock";
 import { MachineHealthStrip } from "../../components/portal/machines/MachineHealthStrip";
 import { MachineKioskTexts } from "../../components/portal/machines/MachineKioskTexts";
@@ -100,7 +101,11 @@ function MachineDetailPage({
   currencies,
   languages,
   onRefresh,
-}: MachineDetailPageProps & { onRefresh: () => void }) {
+  onMachineRenamed,
+}: MachineDetailPageProps & {
+  onRefresh: () => void;
+  onMachineRenamed: (title: string) => void;
+}) {
   const baseHealth = buildMachineHealthRow(machine);
   const health = cells
     ? applyStoredPowderLevels(baseHealth, machine, cells)
@@ -108,6 +113,7 @@ function MachineDetailPage({
   return (
     <PortalShell
       title={machine.title || "Machine detail"}
+      titleAction={<MachineNameEditor machine={machine} onSaved={onMachineRenamed} />}
       description="Machine access and status are sourced from the signed-in client's Strapi records."
       clientName={session.client.company} billingEnabled={session.client.subscription_billing_enabled}
     >
@@ -254,6 +260,20 @@ export default function MachineDetailRoute() {
       <MachineDetailPage
         {...data}
         onRefresh={() => void mutate()}
+        onMachineRenamed={(title) => {
+          void mutate((current) => current ? {
+            ...current,
+            machine: { ...current.machine, title },
+            session: {
+              ...current.session,
+              machines: current.session.machines.map((machine) =>
+                String(machine.id) === String(current.machine.id)
+                  ? { ...machine, title }
+                  : machine,
+              ),
+            },
+          } : current, { revalidate: false });
+        }}
       />
     </PortalPageContent>
   );

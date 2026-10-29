@@ -118,7 +118,7 @@ export default function Step2Page({ currencies }: Step2PageProps) {
                   onChange={(event) => setMachineTitle(event.target.value)}
                   maxLength={MACHINE_TITLE_MAX_LENGTH}
                 />
-                <FormHelperText>You can change this name before registering.</FormHelperText>
+                <FormHelperText>You can change this name later in your client portal.</FormHelperText>
               </FormControl>
               <Text color={muted} mt="3">Serial number: {serialNumber}</Text>
             </Box>

@@ -20,6 +20,7 @@ import {
   PortalPageLoading,
 } from "../../components/portal/PortalPageState";
 import { MachineHealthStrip } from "../../components/portal/machines/MachineHealthStrip";
+import { MachineNameEditor } from "../../components/portal/machines/MachineNameEditor";
 import { getSmallestMediaUrl } from "../../lib/portal/media";
 import { usePortalPage } from "../../lib/portal/usePortalPage";
 import type {
@@ -40,7 +41,10 @@ type MachineHealthWithCells = MachineHealthRow & {
   cells?: PortalMachineCell[];
 };
 
-function MachinesPage({ session }: MachinesPageProps) {
+function MachinesPage({
+  session,
+  onMachineRenamed,
+}: MachinesPageProps & { onMachineRenamed: (id: string | number, title: string) => void }) {
   const machines = session.machines;
   const [healthRows, setHealthRows] = useState<MachineHealthWithCells[]>([]);
   const [isHealthLoading, setIsHealthLoading] = useState(true);
@@ -167,9 +171,8 @@ function MachinesPage({ session }: MachinesPageProps) {
 
                   <VStack spacing="2" align="stretch" flex="1" minW="0">
                     <HStack
-                      justify="space-between"
-                      align="flex-start"
-                      spacing="3"
+                      align="center"
+                      spacing="2"
                     >
                       <Text
                         color="bg.50"
@@ -180,6 +183,10 @@ function MachinesPage({ session }: MachinesPageProps) {
                       >
                         {machine.title || `Machine #${machine.id}`}
                       </Text>
+                      <MachineNameEditor
+                        machine={machine}
+                        onSaved={(title) => onMachineRenamed(machine.id, title)}
+                      />
                     </HStack>
                     <HStack justify="space-between" spacing="3" flexWrap="wrap">
                       <Stack
@@ -295,7 +302,20 @@ export default function MachinesRoute() {
 
   return (
     <PortalPageContent session={data.session}>
-      <MachinesPage {...data} />
+      <MachinesPage
+        {...data}
+        onMachineRenamed={(id, title) => {
+          void mutate((current) => current ? {
+            ...current,
+            session: {
+              ...current.session,
+              machines: current.session.machines.map((machine) =>
+                String(machine.id) === String(id) ? { ...machine, title } : machine,
+              ),
+            },
+          } : current, { revalidate: false });
+        }}
+      />
     </PortalPageContent>
   );
 }
