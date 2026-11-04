@@ -215,9 +215,14 @@ export function NewProductForm({
             price={dosage.fullDrinkPrice}
             currencyCode={priceCurrency.code}
             name={name}
+            productType={productType}
             onBrandChange={onBrandChange}
             onDosageChange={(product) => onDosageChange({ ...dosage, product })}
             onNameChange={onNameChange}
+            onProductTypeChange={(value) => {
+              onProductTypeChange(value);
+              onServingUnitChange(value === "concentrate" ? "ml" : "g");
+            }}
             onPriceChange={(fullDrinkPrice) =>
               onDosageChange({ ...dosage, fullDrinkPrice })
             }

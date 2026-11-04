@@ -575,9 +575,9 @@ export function NewProductPage({
     if (!(baseGrams > 0)) return [];
     if (isDependent) {
       return [
-        `${capitalizeName(target.name)} ${baseGrams} g + ${capitalizeName(name || "Add-on")} ${
+        `${capitalizeName(target.name)} ${baseGrams} ${target.product_type === "concentrate" ? "ml" : "g"} + ${capitalizeName(name || "Add-on")} ${
           addonGrams > 0 ? addonGrams : "?"
-        } g`,
+        } ${productType === "concentrate" ? "ml" : "g"}`,
       ];
     }
     const ratio = 40;
@@ -787,6 +787,8 @@ export function NewProductPage({
             canBeAddedToIds,
             ...(isDependent
               ? {
+                  productType,
+                  servingUnit: productType === "concentrate" ? "ml" : "g",
                   dosage: {
                     product: Number(addonDosage),
                     fullDrinkPrice: Number(addonPrice),

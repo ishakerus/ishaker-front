@@ -575,6 +575,7 @@ export const loadProductEditorPage = async (
   }
   candidateParams.set("fields[0]", "name");
   candidateParams.set("fields[1]", "is_dependent");
+  candidateParams.set("fields[2]", "product_type");
   candidateParams.set("populate[dosage]", "*");
   candidateParams.set("populate[can_be_added_to][fields][0]", "name");
   candidateParams.set("populate[product_line][fields][0]", "name");

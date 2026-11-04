@@ -6,9 +6,11 @@ import {
   Input,
   NumberInput,
   NumberInputField,
+  Select,
   Text,
 } from "@chakra-ui/react";
 import { ADDON_NAME_MAX_LENGTH } from "../../../../lib/portal/addonName";
+import type { PortalProductType } from "../../../../types/portal";
 import {
   SearchableImageSelect,
   type SearchableImageOption,
@@ -21,10 +23,12 @@ type AddonProductFieldsProps = {
   price: string;
   currencyCode: string;
   name: string;
+  productType: PortalProductType;
   onBrandChange: (value: string) => void;
   onDosageChange: (value: string) => void;
   onNameChange: (value: string) => void;
   onPriceChange: (value: string) => void;
+  onProductTypeChange: (value: PortalProductType) => void;
 };
 
 export function AddonProductFields({
@@ -34,10 +38,12 @@ export function AddonProductFields({
   price,
   currencyCode,
   name,
+  productType,
   onBrandChange,
   onDosageChange,
   onNameChange,
   onPriceChange,
+  onProductTypeChange,
 }: AddonProductFieldsProps) {
   return (
     <>
@@ -64,11 +70,35 @@ export function AddonProductFields({
           placeholder="e.g. Creatine"
           bg="bg.800"
         />
-        <FormHelperText>Maximum {ADDON_NAME_MAX_LENGTH} characters.</FormHelperText>
+        <FormHelperText>
+          Maximum {ADDON_NAME_MAX_LENGTH} characters.
+        </FormHelperText>
       </FormControl>
 
       <FormControl isRequired>
-        <FormLabel htmlFor="addon-dosage">Dosage (g)</FormLabel>
+        <FormLabel htmlFor="addon-product-type">Product type</FormLabel>
+        <Select
+          id="addon-product-type"
+          value={productType}
+          onChange={(event) =>
+            onProductTypeChange(event.target.value as PortalProductType)
+          }
+          bg="bg.800"
+        >
+          <option value="powder">Powder</option>
+          <option value="concentrate">Syrup / concentrate</option>
+        </Select>
+        <FormHelperText>
+          {productType === "concentrate"
+            ? "Assign this add-on to a syrup container."
+            : "Assign this add-on to a powder container."}
+        </FormHelperText>
+      </FormControl>
+
+      <FormControl isRequired>
+        <FormLabel htmlFor="addon-dosage">
+          Dosage ({productType === "concentrate" ? "ml" : "g"})
+        </FormLabel>
         <NumberInput
           min={0.01}
           precision={2}
@@ -109,8 +139,8 @@ export function AddonProductFields({
           </Text>
         </Box>
         <FormHelperText>
-          Added to the base drink price for one full dose, regardless of cup size.
-          Enter 0 for a free add-on, or at least 0.02 for a paid add-on.
+          Added to the base drink price for one full dose, regardless of cup
+          size. Enter 0 for a free add-on, or at least 0.02 for a paid add-on.
         </FormHelperText>
       </FormControl>
     </>

@@ -333,3 +333,18 @@ test("empty syrup slots retain their bottle capacity", async (t) => {
     });
   }
 });
+
+for (const method of ["POST", "PUT"] as const) {
+  test(`${method} assigns a free syrup add-on to a syrup container without drink artwork or volume`, async (t) => {
+    const result = await assignAddon(t, method, {
+      ...addon,
+      name: "Watermelon",
+      product_type: "concentrate",
+      dosage: { product: 15, full_drink_price: 0, water: 0, full_drink_volume: 0 },
+    }, "concentrate", { position: 5, powderCount: 4, syrupCount: 3, amountKg: 1 });
+    assert.equal(result.statusCode, method === "POST" ? 201 : 200);
+    assert.equal(result.writes[0].data.product, addon.id);
+    assert.equal(result.payload[0].cell_category, "concentrate");
+    assert.equal(result.payload[0].product.is_dependent, true);
+  });
+}

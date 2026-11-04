@@ -27,6 +27,19 @@ test("a free add-on is assignable without drink sizes or artwork", () => {
   assert.equal(canAssignProduct(addon), true);
 });
 
+test("syrup add-ons are assignable with an ml dose and no drink sizes or artwork", () => {
+  for (const price of [0, 0.5]) {
+    const syrup = {
+      ...addon,
+      name: "Watermelon",
+      product_type: "concentrate" as const,
+      dosage: { ...addon.dosage, product: 15, full_drink_price: price },
+    };
+    assert.deepEqual(getProductAssignmentProblems(syrup), []);
+    assert.equal(canAssignProduct(syrup), true);
+  }
+});
+
 test("add-on assignment requires an explicit supported price", () => {
   for (const price of [undefined, null, "", -1, 0.01, "NaN", "Infinity"]) {
     assert.deepEqual(

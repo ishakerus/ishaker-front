@@ -23,6 +23,7 @@ async function submitProduct(
     existingOwner?: "unowned" | "another_client";
     clientAccess?: boolean;
     lineType?: "powder" | "concentrate";
+    existingType?: "powder" | "concentrate";
   } = {},
 ) {
   const writes: Array<{ path: string; method: string; data: any }> = [];
@@ -103,6 +104,8 @@ async function submitProduct(
             id: 7,
             name: "Creatine",
             dosage: { conversion_factor: 3.25 },
+            product_type: options.existingType || "powder",
+            serving_unit: options.existingType === "concentrate" ? "ml" : "g",
           },
         });
       }
@@ -428,4 +431,52 @@ test("explicit product types and serving units are preserved in concentrate line
   assert.equal(result.statusCode, 201);
   assert.equal(result.writes[0].data.product_type, "powder");
   assert.equal(result.writes[0].data.serving_unit, "g");
+});
+
+for (const method of ["POST", "PUT"]) {
+  test(`${method} honours a syrup add-on type even in a powder product line`, async (t) => {
+    const result = await submitProduct(t, {
+      ...addon,
+      ...(method === "PUT" ? { existingProductId: "7" } : {}),
+      productType: "concentrate",
+      servingUnit: "ml",
+    }, { method, lineType: "powder", existingType: "powder" });
+    assert.equal(result.statusCode, method === "POST" ? 201 : 200);
+    assert.equal(result.writes[0].data.product_type, "concentrate");
+    assert.equal(result.writes[0].data.serving_unit, "ml");
+    assert.equal(result.writes[0].data.is_dependent, true);
+    assert.equal(result.writes[0].data.dosage.product, 5);
+    if (method === "PUT") assert.equal(result.writes[0].data.dosage.conversion_factor, 3.25);
+  });
+}
+
+test("changing an add-on to syrup also defaults its serving unit to ml", async (t) => {
+  const result = await submitProduct(t, {
+    ...addon,
+    existingProductId: "7",
+    productType: "concentrate",
+  }, { method: "PUT", existingType: "powder" });
+  assert.equal(result.statusCode, 200);
+  assert.equal(result.writes[0].data.product_type, "concentrate");
+  assert.equal(result.writes[0].data.serving_unit, "ml");
+});
+
+test("legacy add-on edits without a type keep the existing syrup type and ml unit", async (t) => {
+  const result = await submitProduct(t, {
+    ...addon,
+    existingProductId: "7",
+  }, { method: "PUT", lineType: "powder", existingType: "concentrate" });
+  assert.equal(result.statusCode, 200);
+  assert.equal(result.writes[0].data.product_type, "concentrate");
+  assert.equal(result.writes[0].data.serving_unit, "ml");
+});
+
+test("add-ons reject unsupported product types and serving units", async (t) => {
+  for (const body of [{ ...addon, productType: "unknown" }, { ...addon, servingUnit: "kg" }]) {
+    await t.test(JSON.stringify(body), async (subtest) => {
+      const result = await submitProduct(subtest, body);
+      assert.equal(result.statusCode, 400);
+      assert.equal(result.writes.length, 0);
+    });
+  }
 });

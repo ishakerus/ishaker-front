@@ -250,8 +250,10 @@ export async function handler(req: NextApiRequest, res: NextApiResponse) {
   const name = capitalizeName(asString(req.body?.name));
   const description = asString(req.body?.description);
   let productType = asString(req.body?.productType);
+  const hasExplicitProductType = Boolean(productType);
   const productPurpose = asString(req.body?.productPurpose);
   let servingUnit = asString(req.body?.servingUnit);
+  const hasExplicitServingUnit = Boolean(servingUnit);
   const servingQty = Number(req.body?.servingQty);
 
   if (!productLineId) {
@@ -388,10 +390,10 @@ export async function handler(req: NextApiRequest, res: NextApiResponse) {
     });
   }
   if (
-    !isDependent &&
-    ((servingUnit && !["g", "ml"].includes(servingUnit)) ||
+    (servingUnit && !["g", "ml"].includes(servingUnit)) ||
+    (!isDependent && (
       !Number.isFinite(servingQty) ||
-      servingQty <= 0)
+      servingQty <= 0))
   ) {
     return res.status(400).json({
       error: "invalid_serving",
@@ -545,13 +547,21 @@ export async function handler(req: NextApiRequest, res: NextApiResponse) {
       if (Number.isFinite(conversionFactor) && conversionFactor > 0) {
         submittedDosage.conversion_factor = conversionFactor;
       }
+      const addonProductType = hasExplicitProductType
+        ? productType
+        : existingProduct?.product_type || productType;
+      const addonServingUnit = hasExplicitServingUnit
+        ? servingUnit
+        : !hasExplicitProductType && existingProduct?.serving_unit
+          ? existingProduct.serving_unit
+          : addonProductType === "concentrate" ? "ml" : "g";
       const data = {
         name,
         brand: brand.id,
-        product_type: isEditing ? existingProduct?.product_type || productType : productType,
+        product_type: addonProductType,
         description: null,
         serving_qty: null,
-        serving_unit: isEditing ? existingProduct?.serving_unit || servingUnit : servingUnit,
+        serving_unit: addonServingUnit,
         components: { set: [] },
         nutrition: [],
         dosage: submittedDosage,
